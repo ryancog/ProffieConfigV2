@@ -20,7 +20,7 @@
  */
 
 bool Config::Setting::DefineBase::isDisabled() {
-    bool hasRequired{requireAny ? false : true};
+    bool hasRequired{!requireAny};
     for (const auto& reqName : require) {
         auto req{group.find(reqName)};
         if (req == group.end() && !requireAny) {
@@ -29,7 +29,7 @@ bool Config::Setting::DefineBase::isDisabled() {
         }
 
         if (req->second->getType() != SettingType::TOGGLE && req->second->getType() != SettingType::SELECTION) continue;
-        auto castReq{static_cast<Toggle<DefineBase>*>(req->second)};
+        auto *castReq{static_cast<Toggle<DefineBase>*>(req->second)};
 
         if (requireAny && castReq->value) {
             hasRequired = true;
@@ -42,7 +42,7 @@ bool Config::Setting::DefineBase::isDisabled() {
     for (const auto& [ _, disabler ] : group) {
         if (disabler->getType() != SettingType::TOGGLE && disabler->getType() != SettingType::SELECTION) continue;
 
-        auto castDis{static_cast<Toggle<DefineBase>*>(disabler)};
+        auto *castDis{static_cast<Toggle<DefineBase>*>(disabler)};
         if (castDis->disable.find(define) == castDis->disable.end()) continue;
 
         disabled |= !castDis->value;

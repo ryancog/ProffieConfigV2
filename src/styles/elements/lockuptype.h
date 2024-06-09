@@ -51,7 +51,7 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    LockupTypeStyle(const char* osName, const char* humanName, const LockupType lockType, const BladeStyle* parent);
+    LockupTypeStyle(const char* osName, const char* humanName, const LockupType lockType);
 
 private:
     static const StyleMap map;

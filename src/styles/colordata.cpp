@@ -54,4 +54,3 @@ ColorData ColorData::operator>>(int32_t shift) const {
     };
 }
 
-

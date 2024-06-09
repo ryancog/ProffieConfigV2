@@ -18,19 +18,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <iostream>
+#include <memory>
+#include <ostream>
+#include <unistd.h>
 #include <wx/app.h>
 #include <wx/frame.h>
 
-#include "config/config.h"
 #include "appcore/state.h"
-#include "styleeditor/styleeditor.h"
+#include "styles/bladestyle.h"
 #include "styles/parse.h"
 #include "test/uitest.h"
-#include "wx/gdicmn.h"
 
 class ProffieConfig : public wxApp {
 public:
-    virtual bool OnInit() override {
+    bool OnInit() override {
 #   	ifdef __WXMSW__
         MSWEnableDarkMode();
         if (AttachConsole(ATTACH_PARENT_PROCESS) || AllocConsole()){
@@ -50,16 +52,22 @@ public:
         // auto config{Config::readConfig("problemConfig.h")};
         // Config::writeConfig("test/problemConfig.h", *config);
 
-        // std::unique_ptr<BladeStyles::BladeStyle> style{BladeStyles::parseString("StylePtr<Cylon<Blue, 20, 20, Green, 10, 200, 1000, DarkOrange>>()")};
-        // auto styleStr{BladeStyles::asString(*style)};
+        std::unique_ptr<BladeStyles::BladeStyle> style{BladeStyles::parseString(
+                "// This is a line comment, lol!\n"
+                "/* This is a block comment\n"
+                "that spans multiple lines\n"
+                "and is kinda scary\n"
+                "*/\n"
+                "StylePtr<Cylon<AudioFlicker<Blue, Black>, 20, 20, Green, 10, 200, 1000, DarkOrange>>()"
+                )};
+        auto styleStr{BladeStyles::asString(*style)};
+        std::cout << styleStr.value() << std::endl;
 
-        // StyleEditor::launch(nullptr);
-
-        auto testFrame{Test::init()};
+        auto* testFrame{Test::init()};
         testFrame->Show();
 
         return true;
     }
 };
 
-wxIMPLEMENT_APP(ProffieConfig);
+wxIMPLEMENT_APP(ProffieConfig); // NOLINT

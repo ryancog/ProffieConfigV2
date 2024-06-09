@@ -19,9 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string>
+#include <cstdint>
 #include <optional>
-#include <stdint.h>
+#include <string>
 
 namespace Config {
 
@@ -53,4 +53,4 @@ struct Button {
 std::optional<std::string> buttonTypeToStr(Button::Type);
 std::optional<Button::Type> strToButtonType(const std::string&);
 
-}
+} // namespace Config

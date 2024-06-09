@@ -19,16 +19,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <map>
 #include <string>
 #include <unordered_map>
-#include <map>
 #include <unordered_set>
 
 #include "ui/combobox.h"
-#include "ui/toggle.h"
-#include "ui/selection.h"
 #include "ui/numeric.h"
 #include "ui/numericdec.h"
+#include "ui/selection.h"
+#include "ui/toggle.h"
 
 namespace Config::Setting {
 
@@ -40,8 +40,8 @@ template<class> struct Numeric;
 template<class> struct Decimal;
 template<class> struct Combo;
 
-typedef std::map<std::string, DefineBase*> DefineMap;
-typedef std::unordered_map<std::string, SettingBase*> SettingMap;
+using DefineMap = std::map<std::string, DefineBase *>;
+using SettingMap = std::unordered_map<std::string, SettingBase *>;
 
 enum class SettingType {
     TOGGLE,
@@ -52,11 +52,17 @@ enum class SettingType {
 };
 
 struct SettingBase {
+    SettingBase() = default;
+    SettingBase(const SettingBase &) = default;
+    SettingBase(SettingBase &&) = delete;
+    SettingBase &operator=(const SettingBase &) = default;
+    SettingBase &operator=(SettingBase &&) = delete;
+    virtual ~SettingBase() = default;
+
     std::string name;
     std::string description;
 
-    virtual SettingType getType() const = 0;
-    virtual ~SettingBase() {}
+    [[nodiscard]] virtual SettingType getType() const = 0;
 };
 
 struct DefineBase : SettingBase {
@@ -68,36 +74,33 @@ struct DefineBase : SettingBase {
     std::unordered_set<std::string> require;
     bool requireAny{false};
 
-    virtual SettingType getType() const = 0;
+    SettingType getType() const override = 0;
     virtual bool isDisabled();
-    virtual ~DefineBase() {}
 };
 
 
-template<class Base>
-struct Toggle : Base {
+template<class BASE>
+struct Toggle : BASE {
     std::unordered_set<std::string> disable;
     bool value{false};
 
     PCUI::Toggle* control{nullptr};
 
     virtual SettingType getType() const { return SettingType::TOGGLE; }
-    virtual ~Toggle() {}
 };
 
-template<class Base>
-struct Selection : Toggle<Base> {
+template<class BASE> 
+struct Selection : Toggle<BASE> {
     bool output{true};
     std::unordered_set<Selection*> peers;
 
     PCUI::Selection* control{nullptr};
 
-    virtual SettingType getType() const { return SettingType::SELECTION; }
-    virtual ~Selection() {}
+    [[nodiscard]] virtual SettingType getType() const { return SettingType::SELECTION; }
 };
 
-template<class Base>
-struct Numeric : Base {
+template<class BASE>
+struct Numeric : BASE {
     int32_t min{0};
     int32_t max{100};
     int32_t value{min};

@@ -34,6 +34,7 @@
 #include <wx/sizer.h>
 #include <wx/menu.h>
 #include <wx/clipbrd.h>
+#include <wx/dataobj.h>
 
 #include "styleeditor/blocks/bitsctrl.h"
 #include "styles/documentation/styledocs.h"
@@ -45,12 +46,11 @@
 #include "styles/parse.h"
 #include "ui/bool.h"
 #include "ui/numeric.h"
-#include "wx/dataobj.h"
 
 using namespace PCUI;
 
 wxDEFINE_EVENT(PCUI::SB_COLLAPSED, wxCommandEvent);
-std::unordered_map<const BladeStyles::BladeStyle*, StyleBlock*> StyleBlock::blockMap{};
+std::unordered_map<const BladeStyles::BladeStyle*, StyleBlock*> StyleBlock::blockMap;
 
 StyleBlock::StyleBlock(MoveArea* moveParent, wxWindow* parent, BladeStyles::BladeStyle* style) :
     Block(parent, style->getType()),
@@ -59,10 +59,10 @@ StyleBlock::StyleBlock(MoveArea* moveParent, wxWindow* parent, BladeStyles::Blad
     name(style->humanName) {
 
     SetName("StyleBlock");
+    blockMap.emplace(style, this);
+
     routine = std::bind(&StyleBlock::tryAdopt, this, std::placeholders::_1, std::placeholders::_2);
     bindEvents();
-
-    blockMap.emplace(style, this);
 
     bindChildren();
     initHelp();
@@ -81,12 +81,12 @@ void StyleBlock::bindEvents() {
     Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { collapse(!collapsed); }, COLLAPSE);
     Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { 
         if (!wxClipboard::Get()->Open()) return;
-        wxClipboard::Get()->SetData(new wxTextDataObject(getString()));
+        wxClipboard::Get()->SetData(new wxTextDataObject(getString().value_or("INVALID STYLE")));
         wxClipboard::Get()->Close();
     }, COPY);
     Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { 
         if (!wxClipboard::Get()->Open()) return;
-        wxClipboard::Get()->SetData(new wxTextDataObject(getString()));
+        wxClipboard::Get()->SetData(new wxTextDataObject(getString().value_or("INVALID STYLE")));
         wxClipboard::Get()->Close();
         Destroy();
     }, CUT);
@@ -96,93 +96,81 @@ void StyleBlock::bindEvents() {
 void StyleBlock::bindChildren() {
     for (const auto& param : style->getParams()) {
         if (!(param->getType() & BladeStyles::STYLETYPE)) continue;
-        auto paramStyle{static_cast<const BladeStyles::StyleParam*>(param)->getStyle()};
-        if (!paramStyle) continue;
-        if (blockMap.find(paramStyle) != blockMap.end()) continue;
+        auto styleParam{static_cast<const BladeStyles::StyleParam*>(param)};
+        auto style{styleParam->getStyle()};
+        if (!style) continue;
 
-        new StyleBlock(moveArea, GetParent(), const_cast<BladeStyles::BladeStyle*>(paramStyle));
+        new StyleBlock(moveArea, this, const_cast<BladeStyles::BladeStyle*>(style));
     }
 }
 
-std::string StyleBlock::getString() const { 
+std::optional<std::string> StyleBlock::getString() const { 
     auto style{getStyle()};
     auto ret{BladeStyles::asString(*style)};
     delete style;
-    return ret.value_or("");
+    return ret;
 }
 
-BladeStyles::BladeStyle* StyleBlock::getStyle() const {
-    // auto gen{BladeStyles::Generator::get(name.ToStdString())};
-
-    // std::vector<BladeStyles::Value> args;
-    // for (const auto& arg : argsInfo) {
-    //     if (arg.argBlock) {
-    //         auto styleBlock{dynamic_cast<StyleBlock*>(arg.argBlock)};
-    //         if (styleBlock) args.push_back(styleBlock->getStyle());
-    //         else {
-    //             auto staticBlock{dynamic_cast<StaticBlock*>(arg.argBlock)};
-    //             if (staticBlock) args.push_back(staticBlock->getValue());
-    //             else args.push_back(std::nullopt);
-    //         }
-    //     } else if (arg.numCtrl && arg.numCtrl->IsEnabled()) {
-    //         args.push_back(arg.numCtrl->entry()->GetValue());
-    //     } else if (arg.bitsCtrl && arg.bitsCtrl->IsEnabled()) {
-    //         // TODO
-    //         args.push_back(0);
-    //     } else if (arg.type & BladeStyles::REFMASK) {
-    //         auto refNum{(arg.type & BladeStyles::REFMASK) >> 16};
-    //         args.push_back(args.at(refNum - 1));
-    //     } else args.push_back(std::nullopt);
-    // }
-
-    // return gen(args);
-}
-
+const BladeStyles::BladeStyle* StyleBlock::getStyle() const { return style; }
 bool StyleBlock::isCollapsed() const { return collapsed; }
 
 void StyleBlock::initHelp() {
-    helpButton = new wxButton(this, HELP, "?", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+    helpButton = new wxButton(this, HELP, " ? ", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
     Bind(wxEVT_BUTTON, [&](wxCommandEvent&){
         BladeStyles::Documentation::open(name.ToStdString());
     });
 }
 
 void StyleBlock::doOnGrab() {
+    auto parentBlock{dynamic_cast<StyleBlock*>(GetParent())};
+    if (!parentBlock) return;
 
+    for (auto param : parentBlock->style->getParams()) {
+        if (!(param->getType() & BladeStyles::STYLETYPE)) continue;
+        auto styleParam{static_cast<BladeStyles::StyleParam*>(param)};
+
+        if (styleParam->getStyle() != style) continue;
+        // We *are* the style, so we can ignore the return.
+        (void)styleParam->detachStyle();
+    }
 }
 
-bool StyleBlock::tryAdopt(wxWindow* window, wxPoint pos) {
-        auto block{dynamic_cast<Block*>(window)};
+bool StyleBlock::tryAdopt(Movable* window, wxPoint pos) {
+        auto block{dynamic_cast<StyleBlock*>(window)};
         if (!block) return false;
 
-        // ArgInfo* argToFill{nullptr};
-        // for (auto& arg : argsInfo) {
-        //     if (arg.numCtrl || arg.bitsCtrl) continue;
+        const BladeStyles::Param* paramToFill{nullptr};
 
-        //     auto typesEqual{(arg.type & block->type) & BladeStyles::FLAGMASK};
-        //     if (!typesEqual) continue;
+        for (size_t i{0}; i < paramsData.size(); i++) {
+            auto& paramData{paramsData.at(i)};
+            auto param{style->getParam(i)};
+            if (paramData.control) continue;
 
-        //     auto argScreenLoc{Block::GetScreenPosition() + arg.drawLoc};
-        //     auto argReg{wxRegion(argScreenLoc.x, argScreenLoc.y, size.x - arg.drawLoc.x, arg.size.y)};
-        //     
-        //     if (argReg.Contains(pos)) {
-        //         argToFill = &arg;
-        //         break;
-        //     }
-        // }
+            auto typesEqual{param->getType() & block->type & BladeStyles::FLAGMASK};
+            if (!typesEqual) continue;
 
-        // if (!argToFill) return false;
+            auto paramScreenLoc{GetScreenPosition() + paramData.rectPos};
+            auto blockScreenEdge{GetScreenPosition() + GetSize()};
 
-        // bool hasArg{static_cast<bool>(argToFill->argBlock)};
-        // if (hasArg) {
-        //     auto argStyleBlock{dynamic_cast<StyleBlock*>(argToFill->argBlock)};
-        //     if (argStyleBlock) argStyleBlock->tryAdopt(window, pos);    
-        // }
+            if (
+                    pos.x > paramScreenLoc.x &&
+                    pos.x < blockScreenEdge.x &&
+                    pos.y > paramScreenLoc.y &&
+                    pos.y < paramScreenLoc.y + paramData.rectSize.y + (borderThickness * 2)
+               ) {
+                paramToFill = param;
+                break;
+            }
+        }
 
-        // if (!hasArg) {
-        //     argToFill->argBlock = block;
-        //     argToFill->argBlock->Reparent(this);
-        // }
+        if (!paramToFill) return false;
+        auto styleParam{static_cast<const BladeStyles::StyleParam*>(paramToFill)};
+
+        auto paramStyle{styleParam->getStyle()};
+        if (paramStyle) return blockMap.find(paramStyle)->second->tryAdopt(window, pos);    
+
+        const_cast<BladeStyles::StyleParam*>(styleParam)->setStyle(const_cast<BladeStyles::BladeStyle*>(block->getStyle()));
+        block->Reparent(this);
 
         update();
         
@@ -191,12 +179,18 @@ bool StyleBlock::tryAdopt(wxWindow* window, wxPoint pos) {
 
 bool StyleBlock::hitTest(wxPoint point) const {
     if (point.x < 0 || point.y < 0) return false;
-    if (point.x > rectSize.x || point.y > rectSize.y) return false;
+    if (point.x > size.x || point.y > size.y) return false;
 
-    // for (const auto& arg : argsInfo) {
-    //     auto argReg{wxRegion(arg.drawLoc.x, arg.drawLoc.y, arg.size.x, arg.size.y)};
-    //     if (argReg.Contains(point)) return false;
-    // }
+    for (const auto& param : paramsData) {
+        if (
+                point.x > param.rectPos.x && 
+                point.x < param.rectPos.x + param.rectSize.x &&
+                point.y > param.rectPos.y &&
+                point.y < param.rectPos.y + param.rectSize.y
+           ) {
+            return false;
+        }
+    }
 
     return true;
 }
@@ -204,7 +198,7 @@ bool StyleBlock::hitTest(wxPoint point) const {
 void StyleBlock::update(bool repaint) {
     calc();
     if (repaint) paintNow();
-    moveParamBlocks();
+    updateElementPos();
     auto sizeToSet{collapsed ? rectSize : size};
     Block::SetSize(sizeToSet);
     Block::SetMinSize(sizeToSet);
@@ -223,7 +217,7 @@ void StyleBlock::recurseUpdate(bool repaint) {
 }
 
 void StyleBlock::collapse(bool collapse) {
-    // if (argsInfo.size() == 0) return;
+    if (paramsData.size() == 0) return;
     if (collapse == collapsed) return;
 
     collapsed = collapse;
@@ -243,22 +237,6 @@ void StyleBlock::showPopMenu(wxMouseEvent& evt) {
     menu.Append(HELP, "View StyleDoc");
 
     PopupMenu(&menu, evt.GetPosition());
-}
-
-void StyleBlock::moveParamBlocks() {
-    helpButton->SetPosition(helpPos);
-    // for (auto& argInfo : argsInfo) {
-    //     if (argInfo.argBlock) {
-    //         argInfo.argBlock->SetPosition({
-    //                                           argInfo.drawLoc.x + borderThickness,
-    //                                           argInfo.drawLoc.y + borderThickness
-    //                                       });
-    //     } else if (argInfo.numCtrl) {
-    //         auto size{argInfo.numCtrl->GetBestSize()};
-    //         argInfo.numCtrl->SetPosition(argInfo.drawLoc);
-    //         argInfo.numCtrl->SetSize(size);
-    //     }
-    // }
 }
 
 void StyleBlock::calc() {
@@ -321,9 +299,11 @@ void StyleBlock::calc() {
         auto paramStyle{static_cast<StyleParam*>(param)->getStyle()};
         if ((paramType & STYLETYPE) && paramStyle) {
             data.rectSize = blockMap.find(paramStyle)->second->GetSize();
+        } else if (data.control) {
+            data.rectSize = data.control->GetBestSize();
         } else {
             data.rectSize.x = -1;
-            data.rectSize.y = 20;
+            data.rectSize.y = 30;
         }
 
         if (paramType & WRAPPER) {
@@ -336,13 +316,13 @@ void StyleBlock::calc() {
             data.colors.push_back(function3DColor);
 		} if (paramType & NUMBER) {
             auto numberParam{static_cast<NumberParam*>(param)};
-            if (!data.control) data.control.reset(new PCUI::Numeric(this, wxID_ANY, wxEmptyString, wxDefaultSize, 0, -32768, 32768, numberParam->getNum()));
+            if (!data.control) data.control = new PCUI::Numeric(this, wxID_ANY, wxEmptyString, wxDefaultSize, 0, -32768, 32768, numberParam->getNum());
 		} if (paramType & BITS) {
             auto bitsParam{static_cast<BitsParam*>(param)};
-            if (!data.control) data.control.reset(new PCUI::BitsCtrl(this, wxID_ANY, 16, bitsParam->getBits(), wxEmptyString, wxDefaultSize));
+            if (!data.control) data.control = new PCUI::BitsCtrl(this, wxID_ANY, 16, bitsParam->getBits(), wxEmptyString, wxDefaultSize);
 		} if (paramType & BOOL) {
             auto boolParam{static_cast<BoolParam*>(param)};
-            if (!data.control) data.control.reset(new PCUI::Bool(this, wxID_ANY, boolParam->getBool()));
+            if (!data.control) data.control = new PCUI::Bool(this, wxID_ANY, boolParam->getBool());
 		} if (paramType & COLOR) {
             data.colors.push_back(colorColor);
 		} if (paramType & LAYER) {
@@ -409,12 +389,39 @@ void StyleBlock::calc() {
     rectSize.x += edgePadding;
     rectSize.y += edgePadding;
 
-    // if (argsInfo.size() > 0) helpPos.y = (headerBarPos.y - helpButtonSize.y) / 2;
-    // else helpPos.y = (rectSize.y - helpButtonSize.y) / 2;
+    if (paramsData.size() > 0) helpPos.y = (headerBarPos.y - helpButtonSize.y) / 2;
+    else helpPos.y = (rectSize.y - helpButtonSize.y) / 2;
 
     if (size.x < rectSize.x) size.x = rectSize.x;
     if (size.y < rectSize.y) size.y = rectSize.y;
     size.x += borderThickness; // For block borders
+}
+
+void StyleBlock::updateElementPos() {
+    helpButton->SetPosition(helpPos);
+    for (size_t i{0}; i < paramsData.size(); i++) {
+        auto& paramData{paramsData.at(i)};
+        auto param{style->getParam(i)};
+
+        switch (param->getType() & BladeStyles::FLAGMASK) {
+            case BladeStyles::BITS:
+            case BladeStyles::NUMBER:
+            case BladeStyles::BOOL: {
+                paramData.control->SetPosition(paramData.rectPos);
+                paramData.control->SetSize(paramData.rectSize);
+                break; }
+            default:
+                auto style{static_cast<const BladeStyles::StyleParam*>(param)->getStyle()};
+                auto block{blockMap.find(style)};
+                if (block == blockMap.end()) continue;
+
+                block->second->SetPosition({
+                        paramData.rectPos.x + borderThickness,
+                        paramData.rectPos.y + borderThickness,
+                        });
+                break;
+        };
+    }
 }
 
 void StyleBlock::render(wxDC& dc) {
@@ -428,6 +435,7 @@ void StyleBlock::render(wxDC& dc) {
     dc.SetClippingRegion(0, 0, rectSize.x, rectSize.y);
     dc.DrawRoundedRectangle(0, 0, rectSize.x, rectSize.y, 5);
 
+    dc.SetTextForeground(*textColor);
     dc.DrawText(name, headerTextPos.x, headerTextPos.y);
 
     if (paramsData.size() > 0) {

@@ -19,14 +19,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string>
 #include <optional>
+#include <string>
+
 
 #include "bladestyle.h"
 
 namespace BladeStyles {
 
 BladeStyle* parseString(const std::string&, bool* foundStyle = nullptr);
-std::optional<std::string> asString(BladeStyle&);
+std::optional<std::string> asString(const BladeStyle&);
 
-}
+} // namespace BladeStyles

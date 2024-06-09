@@ -22,8 +22,8 @@
 
 using namespace BladeStyles;
 
-EffectStyle::EffectStyle(const char* osName, const char* humanName, const Effect effect, const BladeStyle* parent) :
-    BladeStyle(osName, humanName, EFFECT, {}, parent), effect(effect) {}
+EffectStyle::EffectStyle(const char* osName, const char* humanName, const Effect effect) :
+    BladeStyle(osName, humanName, EFFECT, {}), effect(effect) {}
 
 StyleGenerator EffectStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};
@@ -37,9 +37,9 @@ const StyleMap EffectStyle::map {
 #   define EMAP(enum, humanName) \
     { \
         #enum, \
-        [](const BladeStyle* parent, const std::vector<ParamValue>& params) -> BladeStyle* { \
+        [](const std::vector<ParamValue>& params) -> BladeStyle* { \
             if (params.size()) return nullptr; \
-            return new EffectStyle(#enum, humanName, Effect::enum, parent); \
+            return new EffectStyle(#enum, humanName, Effect::enum); \
         } \
     },
 

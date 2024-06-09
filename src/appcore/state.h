@@ -31,4 +31,4 @@ std::vector<std::string>* getPropFiles();
 std::vector<PropFile::Data*>* getPropData();
 std::vector<std::string>* getConfigFiles();
 
-}
+} // namespace AppCore

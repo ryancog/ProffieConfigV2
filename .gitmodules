@@ -1,0 +1,8 @@
+[submodule "ProffieOS"]
+	path = resources/ProffieOS
+	url = https://github.com/profezzorn/ProffieOS
+	branch = master # v7.x
+[submodule "ProffieOS-StyleEditor"]
+	path = resources/StyleEditor
+	url = https://github.com/profezzorn/ProffieOS-StyleEditor
+	branch = master

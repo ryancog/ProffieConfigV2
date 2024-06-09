@@ -26,5 +26,5 @@ namespace Utility {
 uint64_t getTimeMS();
 uint64_t getTimeMicros();
 
-}
+} // namespace Utility
 

@@ -48,11 +48,11 @@ static constexpr uint8_t blastHump[32]{
  * while non-X functions (if there's an X variant) take raw ints, and wrap the X version.
  */
 
-FunctionStyle::FunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent, StyleType typeOverride) :
-    BladeStyle(osName, humanName, typeOverride ? typeOverride : BladeStyles::FUNCTION, params, parent) {}
+FunctionStyle::FunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, StyleType typeOverride) :
+    BladeStyle(osName, humanName, typeOverride ? typeOverride : BladeStyles::FUNCTION, params) {}
 
-Function3DStyle::Function3DStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent) :
-    BladeStyle(osName, humanName, BladeStyles::FUNCTION3D, params, parent) {}
+Function3DStyle::Function3DStyle(const char* osName, const char* humanName, const std::vector<Param*>& params) :
+    BladeStyle(osName, humanName, BladeStyles::FUNCTION3D, params) {}
 
 StyleGenerator BladeStyles::FunctionStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};
@@ -77,7 +77,7 @@ const StyleMap& Function3DStyle::getMap() { return map; }
 #define FUNCTEMPLATE(styleType, osName, humanName, params, ...) \
     class osName : public styleType { \
     public: \
-        osName(const BladeStyle* parent) : styleType(#osName, humanName, params, parent) {} \
+        osName() : styleType(#osName, humanName, params) {} \
         __VA_ARGS__ \
     }; 
 #define FUNC(osName, humanName, params, ...) FUNCTEMPLATE(FunctionStyle, osName, humanName, PARAMS(params), __VA_ARGS__)
@@ -154,8 +154,8 @@ FUNC(BladeAngle, "Blade Angle",
 
 FUNC(BladeAngleX, "Blade Angle",
         PARAMS(
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768)))
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768)))
             ),
         RUN() {}
         GETINT() { return 0; }
@@ -182,7 +182,7 @@ FUNC(BlastF, "Blast",
             new NumberParam("Fadeout (ms)", 200),
             new NumberParam("Wave Size", 100),
             new NumberParam("Wave Time (ms)", 400),
-            new StyleParam("Trigger Effect", EFFECT, EffectStyle::get("BLAST")(this, PARAMVEC()))
+            new StyleParam("Trigger Effect", EFFECT, EffectStyle::get("BLAST")(PARAMVEC()))
             ),
         RUN(blade) {
             numLeds = blade.numLeds;
@@ -229,7 +229,7 @@ FUNC(BlastF, "Blast",
 FUNC(BlastFadeoutF, "Blast Fadeout",
         PARAMS(
             new NumberParam("Fade Time (ms)", 250),
-            new StyleParam("Trigger Effect", EFFECT, EffectStyle::get("BLAST")(this, PARAMVEC()))
+            new StyleParam("Trigger Effect", EFFECT, EffectStyle::get("BLAST")(PARAMVEC()))
             ),
         RUN(blade) {
             fadeTime = getParamNumber(0);
@@ -264,7 +264,7 @@ FUNC(BlastFadeoutF, "Blast Fadeout",
 // returns up to 32768 when the selected effect occurs.
 FUNC(OriginalBlastF, "Original Blast",
         PARAMS(
-            new StyleParam("Trigger Effect", EFFECT, EffectStyle::get("BLAST")(this, PARAMVEC()))
+            new StyleParam("Trigger Effect", EFFECT, EffectStyle::get("BLAST")(PARAMVEC()))
             ),
         RUN(blade) {
             thisEffect = static_cast<const EffectStyle*>(getParamStyle(0))->effect;
@@ -309,8 +309,8 @@ FUNC(OriginalBlastF, "Original Blast",
 // It's clearly not right, but based on the actual code the following seems correct:
 FUNC(BlinkingF, "Blinking",
         PARAMS(
-            new StyleParam("Time (ms)", FUNCTION, get("Int")(this, PARAMVEC(1000))),
-            new StyleParam("Distribution", FUNCTION, get("Int")(this, PARAMVEC(500)))
+            new StyleParam("Time (ms)", FUNCTION, get("Int")(PARAMVEC(1000))),
+            new StyleParam("Distribution", FUNCTION, get("Int")(PARAMVEC(500)))
             ),
         RUN(blade) {
             pulseTime = const_cast<decltype(pulseTime)>(static_cast<const FunctionStyle*>(getParamStyle(0)));
@@ -404,8 +404,8 @@ FUNC(SlowNoise, "Slow Noise",
 // BUMP_POSITION, BUMP_WIDTH_FRACTION: INTEGER
 FUNC(Bump, "Bump",
         PARAMS(
-            new StyleParam("Position", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Width", FUNCTION, get("Int")(this, PARAMVEC(16385)))
+            new StyleParam("Position", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Width", FUNCTION, get("Int")(PARAMVEC(16385)))
             ),
         RUN(blade) {
             pos = const_cast<FunctionStyle*>(static_cast<const FunctionStyle*>(getParamStyle(0)));
@@ -480,7 +480,7 @@ FUNC(HumpFlickerFX, "Hump Flicker",
 //
 FUNC(CenterDistF, "Center Distribution",
         PARAMS(
-            new StyleParam("Center", FUNCTION, get("Int")(this, PARAMVEC(16384)))
+            new StyleParam("Center", FUNCTION, get("Int")(PARAMVEC(16384)))
             ),
         RUN() {}
         GETINT() {}
@@ -493,7 +493,7 @@ FUNC(CenterDistF, "Center Distribution",
 FUNC(ChangeSlowly, "Change Slowly",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Speed", FUNCTION, get("Int")(this, PARAMVEC(32768))),
+            new StyleParam("Speed", FUNCTION, get("Int")(PARAMVEC(32768))),
             ),
         RUN() {}
         GETINT() {}
@@ -511,8 +511,8 @@ FUNC(ChangeSlowly, "Change Slowly",
 // and 0 for the rest of the LEDs.
 FUNC(CircularSectionF, "Circular Section",
         PARAMS(
-            new StyleParam("Position", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Fraction", FUNCTION, get("Int")(this, PARAMVEC(16384))),
+            new StyleParam("Position", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Fraction", FUNCTION, get("Int")(PARAMVEC(16384))),
             ),
         RUN() {}
         GETINT() {}
@@ -537,8 +537,8 @@ FUNC(ClampF, "Clamp",
 FUNC(ClampFX, "Clamp",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768))),
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768))),
             ),
         RUN() {}
         GETINT() {}
@@ -561,8 +561,8 @@ FUNC(ClashImpactF, "Clash Impact",
 
 FUNC(ClashImpactFX, "Clash Impact",
         PARAMS(
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768))),
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768))),
             ),
         RUN() {}
         GETINT() {}
@@ -618,8 +618,8 @@ FUNC(IncrementWithReset, "Increment With Reset",
         PARAMS(
             new StyleParam("Increment Pulse",   FUNCTION, nullptr),
             new StyleParam("Pulse Reset", 	    FUNCTION, nullptr),
-            new StyleParam("Max", 			    FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Increment", 		FUNCTION, get("Int")(this, PARAMVEC(1)))
+            new StyleParam("Max", 			    FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Increment", 		FUNCTION, get("Int")(PARAMVEC(1)))
             ),
         RUN() {}
         GETINT() {}
@@ -634,8 +634,8 @@ FUNC(IncrementWithReset, "Increment With Reset",
 FUNC(EffectIncrementF, "Increment On Effect",
         PARAMS(
             new StyleParam("Trigger Effect", EFFECT, nullptr),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Increment", FUNCTION, get("Int")(this, PARAMVEC(1)))
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Increment", FUNCTION, get("Int")(PARAMVEC(1)))
             ),
         RUN() {}
         GETINT() {}
@@ -666,8 +666,8 @@ FUNC(EffectPosition, "Effect Position",
 FUNC(HoldPeakF, "Hold Peak Value",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Hold Time (ms)", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Ramp Down Speed", FUNCTION, get("Int")(this, PARAMVEC(0))),
+            new StyleParam("Hold Time (ms)", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Ramp Down Speed", FUNCTION, get("Int")(PARAMVEC(0))),
             ),
         RUN() {}
         GETINT() {}
@@ -679,8 +679,8 @@ FUNC(HoldPeakF, "Hold Peak Value",
 // return value: INTEGER
 FUNC(Ifon, "If On",
         PARAMS(
-            new StyleParam("Value if On", FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Value if Off", FUNCTION, get("Int")(this, PARAMVEC(0))),
+            new StyleParam("Value if On", FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Value if Off", FUNCTION, get("Int")(PARAMVEC(0))),
             ),
         RUN() {}
         GETINT() {}
@@ -703,8 +703,8 @@ FUNC(InOutFunc, "In Out Func",
 
 FUNC(InOutFuncX, "In Out Func",
         PARAMS(
-            new StyleParam("Out Time (ms)", FUNCTION, get("Int")(this, PARAMVEC(300))),
-            new StyleParam("In Time (ms)", FUNCTION, get("Int")(this, PARAMVEC(600))),
+            new StyleParam("Out Time (ms)", FUNCTION, get("Int")(PARAMVEC(300))),
+            new StyleParam("In Time (ms)", FUNCTION, get("Int")(PARAMVEC(600))),
             ),
         RUN() {}
         GETINT() {}
@@ -744,8 +744,8 @@ FUNC(InOutHelperF, "In Out Helper",
 FUNC(IncrementModuloF, "Increment With Wrap",
         PARAMS(
             new StyleParam("Pulse Input", FUNCTION, nullptr),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Increment", FUNCTION, get("Int")(this, PARAMVEC(1))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Increment", FUNCTION, get("Int")(PARAMVEC(1))),
             ),
         RUN() {}
         GETINT() {}
@@ -762,8 +762,8 @@ FUNC(IncrementModuloF, "Increment With Wrap",
 FUNC(ThresholdPulseF, "Pulse on Threshold",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Threshold", FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Hysteresis %", FUNCTION, get("Int")(this, PARAMVEC(66))),
+            new StyleParam("Threshold", FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Hysteresis %", FUNCTION, get("Int")(PARAMVEC(66))),
             ),
         RUN() {}
         GETINT() {}
@@ -781,10 +781,10 @@ FUNC(ThresholdPulseF, "Pulse on Threshold",
 FUNC(IncrementF, "Increment on Input",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Increment Threshold", FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Max Value", FUNCTION, get("Int")(this, PARAMVEC(32768))),
-            new StyleParam("Increment", FUNCTION, get("Int")(this, PARAMVEC(1))),
-            new StyleParam("Hysteresis %", FUNCTION, get("Int")(this, PARAMVEC(66))),
+            new StyleParam("Increment Threshold", FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Max Value", FUNCTION, get("Int")(PARAMVEC(32768))),
+            new StyleParam("Increment", FUNCTION, get("Int")(PARAMVEC(1))),
+            new StyleParam("Hysteresis %", FUNCTION, get("Int")(PARAMVEC(66))),
             ),
         RUN() {}
         GETINT() {}
@@ -835,8 +835,8 @@ FUNC(IntSelect, "Number Select",
 FUNC(IsBetween, "Is Between",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768))),
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768))),
             ),
         RUN() {}
         GETINT() {}
@@ -884,8 +884,8 @@ FUNC(IsGreaterThan, "Is Greater Than",
 // creates a "block" of pixels at POSITION taking up FRACTION of blade
 FUNC(LinearSectionF, "Linear Section",
         PARAMS(
-            new StyleParam("Position", FUNCTION, get("Int")(this, PARAMVEC(16384))),
-            new StyleParam("Section Size", FUNCTION, get("Int")(this, PARAMVEC(16384))),
+            new StyleParam("Position", FUNCTION, get("Int")(PARAMVEC(16384))),
+            new StyleParam("Section Size", FUNCTION, get("Int")(PARAMVEC(16384))),
             ),
         RUN() {}
         GETINT() {}
@@ -904,10 +904,10 @@ FUNC(LinearSectionF, "Linear Section",
 // position into a lighted up section.
 FUNC(MarbleF, "Marble Simulation",
         PARAMS(
-            new StyleParam("Direction Offset",  FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Friction",          FUNCTION, get("Int")(this, PARAMVEC(16384))),
-            new StyleParam("Acceleration",      FUNCTION, get("Int")(this, PARAMVEC(16384))),
-            new StyleParam("Gravity",           FUNCTION, get("Int")(this, PARAMVEC(16384))),
+            new StyleParam("Direction Offset",  FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Friction",          FUNCTION, get("Int")(PARAMVEC(16384))),
+            new StyleParam("Acceleration",      FUNCTION, get("Int")(PARAMVEC(16384))),
+            new StyleParam("Gravity",           FUNCTION, get("Int")(PARAMVEC(16384))),
         ),
         RUN() {}
         GETINT() {}
@@ -970,7 +970,7 @@ FUNC(Percentage, "Percentage",
 // to create a flash of color or white when the blade ignites.
 FUNC(OnSparkF, "On Spark",
         PARAMS(
-            new StyleParam("Fade Time (ms)", FUNCTION, get("Int")(this, PARAMVEC(200)))
+            new StyleParam("Fade Time (ms)", FUNCTION, get("Int")(PARAMVEC(200)))
             ),
         RUN() {}
         GETINT() {}
@@ -1025,7 +1025,7 @@ FUNC(EffectRandom, "Random On Effect",
 // NEED A BETTER HUMAN NAME
 FUNC(RandomBlinkF, "Random Per Interval",
         PARAMS(
-            new StyleParam("Time (mHz)", FUNCTION, get("Int")(this, PARAMVEC(1)))
+            new StyleParam("Time (mHz)", FUNCTION, get("Int")(PARAMVEC(1)))
             ),
         RUN() {}
         GETINT() {}
@@ -1038,8 +1038,8 @@ FUNC(RandomBlinkF, "Random Per Interval",
 FUNC(Scale, "Scale",
         PARAMS(
             new StyleParam("Input", FUNCTION, nullptr),
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768)))
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768)))
             ),
         RUN() {}
         GETINT() {}
@@ -1086,9 +1086,9 @@ FUNC(SequenceF, "Binary Sequence",
 // return value: INTEGER
 FUNC(Sin, "Sin",
         PARAMS(
-            new StyleParam("RPM", FUNCTION, get("Int")(this, PARAMVEC(60))),
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768)))
+            new StyleParam("RPM", FUNCTION, get("Int")(PARAMVEC(60))),
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768)))
             ),
         RUN() {}
         GETINT() {}
@@ -1097,9 +1097,9 @@ FUNC(Sin, "Sin",
 // NO DOCUMENTATION
 FUNC(Saw, "Saw",
         PARAMS(
-            new StyleParam("RPM", FUNCTION, get("Int")(this, PARAMVEC(60))),
-            new StyleParam("Min", FUNCTION, get("Int")(this, PARAMVEC(0))),
-            new StyleParam("Max", FUNCTION, get("Int")(this, PARAMVEC(32768)))
+            new StyleParam("RPM", FUNCTION, get("Int")(PARAMVEC(60))),
+            new StyleParam("Min", FUNCTION, get("Int")(PARAMVEC(0))),
+            new StyleParam("Max", FUNCTION, get("Int")(PARAMVEC(32768)))
             ),
         RUN() {}
         GETINT() {}
@@ -1108,7 +1108,7 @@ FUNC(Saw, "Saw",
 // NO DOCUMENTATION
 FUNC(PulsingF, "Pulsing",
         PARAMS(
-            new StyleParam("Time (ms)", FUNCTION, get("Int")(this, PARAMVEC(100)))
+            new StyleParam("Time (ms)", FUNCTION, get("Int")(PARAMVEC(100)))
             ),
         RUN() {}
         GETINT() {}
@@ -1148,8 +1148,8 @@ FUNC(SliceF, "Slice",
 // the blade. If WIDTH is negative, the transition will go the other way.
 FUNC(SmoothStep, "Smooth Step",
         PARAMS(
-            new StyleParam("Position", FUNCTION, get("Int")(this, PARAMVEC(16384))),
-            new StyleParam("Width", FUNCTION, get("Int")(this, PARAMVEC(16384))),
+            new StyleParam("Position", FUNCTION, get("Int")(PARAMVEC(16384))),
+            new StyleParam("Width", FUNCTION, get("Int")(PARAMVEC(16384))),
             ),
         RUN() {}
         GETINT() {}

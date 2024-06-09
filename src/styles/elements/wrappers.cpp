@@ -25,8 +25,8 @@
 
 using namespace BladeStyles;
 
-WrapperStyle::WrapperStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent) :
-    ColorStyle(osName, humanName, params, parent, WRAPPER) {}
+WrapperStyle::WrapperStyle(const char* osName, const char* humanName, const std::vector<Param*>& params) :
+    ColorStyle(osName, humanName, params, WRAPPER) {}
 
 
 StyleGenerator WrapperStyle::get(const std::string& styleName) {
@@ -39,12 +39,12 @@ StyleGenerator WrapperStyle::get(const std::string& styleName) {
 const StyleMap& WrapperStyle::getMap() { return map; }
 
 #define RUN(varname) virtual void run(StylePreview::Blade& varname) override
-#define GETCOLOR(varname) virtual ColorData getColor(int32_t varname) const override
+#define GETCOLOR(varname) virtual ColorData getColor(int32_t varname) override
 
 #define WRAPPER(osName, humanName, params, ...) \
     class osName : public WrapperStyle { \
     public: \
-        osName(const BladeStyle* parent) : WrapperStyle(#osName, humanName, params, parent) {} \
+        osName() : WrapperStyle(#osName, humanName, params) {} \
         __VA_ARGS__ \
     }; 
 

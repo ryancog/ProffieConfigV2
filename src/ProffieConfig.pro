@@ -1,5 +1,5 @@
 TEMPLATE = app
-CONFIG += c++17
+CONFIG += c++20
 CONFIG -= qt
 
 QMAKE_CXXFLAGS += $$system(wx-config --cxxflags)
@@ -67,6 +67,7 @@ SOURCES += \
     stylemanager/stylemanager.cpp \
     styles/bladestyle.cpp \
     styles/parse.cpp \
+    styles/colordata.cpp \
     styles/elements/args.cpp \
     styles/elements/builtin.cpp \
     styles/elements/colors.cpp \
@@ -111,7 +112,9 @@ HEADERS += \
     styleeditor/blocks/block.h \
     styleeditor/blocks/styleblock.h \
     stylemanager/stylemanager.h \
+    styles/parse.h \
     styles/bladestyle.h \
+    styles/colordata.h \
     styles/elements/args.h \
     styles/elements/builtin.h \
     styles/elements/colors.h \
@@ -123,8 +126,6 @@ HEADERS += \
     styles/elements/timefunctions.h \
     styles/elements/transitions.h \
     styles/elements/wrappers.h \
-    styles/generator.h \
-    styles/parse.h \
     styles/documentation/styledocs.h \
     test/uitest.h \
     utility/time.h \

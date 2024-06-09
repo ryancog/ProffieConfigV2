@@ -34,11 +34,9 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    LayerStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent);
+    LayerStyle(const char* osName, const char* humanName, const std::vector<Param*>& params);
 
 private:
-    const BladeStyle* parent;
-
     static const StyleMap map;
 };
 

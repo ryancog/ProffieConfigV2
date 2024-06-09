@@ -19,20 +19,32 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "elements/lockuptype.h"
 #include "log/logger.h"
+#include "styles/bladestyle.h"
+#include <cctype>
+#include <climits>
+#include <cstddef>
+#include <optional>
+#include <string>
 
 using namespace BladeStyles;
 
 struct TokenizedStyle {
     std::string name;
-    std::vector<std::string> args;
+    std::string comment;
+
+    struct Param {
+        std::string rawStr;
+        std::string paramStr;
+        std::string comments;
+    };
+    std::vector<Param> params;
 };
-static std::optional<TokenizedStyle> tokenizeStyle(const std::string&);
+static std::optional<TokenizedStyle> tokenizeStyle(const std::string &);
 
 static std::string typeToString(uint32_t);
 
-BladeStyle* BladeStyles::parseString(const std::string& styleStr, bool* foundStyle) {
+BladeStyle *BladeStyles::parseString(const std::string &styleStr, bool *foundStyle) {
     auto styleTokens{tokenizeStyle(styleStr)};
     if (!styleTokens) return nullptr;
 
@@ -42,66 +54,274 @@ BladeStyle* BladeStyles::parseString(const std::string& styleStr, bool* foundSty
     if (!styleGen) {
         Logger::error("Style not recognized: " + styleTokens->name);
         return nullptr;
-    } else if (foundStyle) *foundStyle = true;
+    } 
+    if (foundStyle) *foundStyle = true;
 
-    auto style{styleGen(nullptr, {})};
+    auto *style{styleGen({})};
+    auto numParams{style->getParams().size()};
+    auto numTokenParams{styleTokens->params.size()};
+    if (
+            numTokenParams < numParams || 
+            (
+             numParams > 0 &&
+             (!(style->getParams().back()->getType() & VARIADIC)) && 
+             numTokenParams > numParams
+            )
+       ) {
+        Logger::error("Incorrect number of parameters for style: " + 
+                styleTokens->name + 
+                " (Expected " + 
+                std::to_string(numParams) +
+                " got " + 
+                std::to_string(numTokenParams) +
+                ")");
+        return nullptr;
+    }
+
+    for (size_t i{0}; i < numTokenParams; i++) {
+        const auto *param{style->getParam(i < numParams ? i : numParams - 1)};
+        auto& tokenParam{styleTokens->params.at(i)};
+
+        int32_t val{0};
+        if (param->getType() & (NUMBER | BITS | BOOL)) {
+            if (tokenParam.paramStr.find("true") != std::string::npos) val = true;
+            else if (tokenParam.paramStr.find("false") != std::string::npos) val = false;
+            else {
+                char* stoiEnd{nullptr};
+                val = static_cast<int32_t>(std::strtol(tokenParam.paramStr.c_str(), &stoiEnd, 0));
+                if (val == 0 && *stoiEnd == 'b' && *(stoiEnd - 1) == '0') {
+                    val = static_cast<int32_t>(std::strtol(stoiEnd + 1, nullptr, 2));
+                }
+            }
+        }
+        switch (param->getType() & FLAGMASK) {
+            case NUMBER:
+                STYLECAST(NumberParam, param)->setNum(val);
+                break;
+            case BITS:
+                STYLECAST(BitsParam, param)->setBits(val);
+                break;
+            case BOOL:
+                STYLECAST(BoolParam, param)->setBool(val);
+                break;
+            default:
+                auto *style{parseString(tokenParam.rawStr, foundStyle)};
+                if (style == nullptr) {
+                    Logger::error("Failure while parsing parameter " + std::to_string(i + 1) + " in style " + styleTokens->name);
+                    return nullptr;
+                }
+                STYLECAST(StyleParam, param)->setStyle(style);
+                break;
+        }
+    }
 
     return style;
 }
 
-std::optional<std::string> BladeStyles::asString(BladeStyle& style) {
+std::optional<std::string> BladeStyles::asString(const BladeStyle& style) {
     std::string ret;
+
+    if (!style.comment.empty()) {
+        ret += "/*\n";
+        ret += style.comment;
+        ret += "\n*/\n";
+    }
+    auto type{style.getType()};
+    if (type & BUILTIN) {
+        ret = '&';
+        ret += style.osName;
+        return ret;
+    }
+
+    auto shouldIndentParams{false};
+    for (auto *const param : style.getParams()) {
+        if (param->getType() & STYLETYPE) {
+            if (static_cast<StyleParam*>(param)->getStyle()->getType() & FIXEDCOLOR) continue;
+            shouldIndentParams = true;
+            break;
+        }
+    }
+
+    ret = style.osName;
+    if (!(style.getType() & FIXEDCOLOR)) ret += '<';
+    for (auto *const param : style.getParams()) {
+        if (shouldIndentParams) ret += "\n\t";
+        switch (param->getType() & FLAGMASK) {
+            case NUMBER:
+                ret += std::to_string(static_cast<NumberParam*>(param)->getNum());
+                break;
+            case BITS: {                
+                auto bits{static_cast<BitsParam*>(param)->getBits()};
+                ret += "0b";
+                for (uint32_t i{0}; i < sizeof(uint16_t) * CHAR_BIT; i++) {
+                    ret += ((bits >> i) & 0x1) ? '1' : '0';
+                }
+                break; }
+            case BOOL:
+                ret += static_cast<BoolParam*>(param)->getBool() ? "true" : "false";
+                break;
+            default:
+                const auto *paramStyle{static_cast<StyleParam*>(param)->getStyle()};
+                if (!paramStyle) return std::nullopt;
+                auto styleStr{asString(*paramStyle)};
+                if (!styleStr) return std::nullopt;
+                if (shouldIndentParams) {
+                    size_t newlinePos{0};
+                    while ((newlinePos = styleStr->find('\n', newlinePos + 1)) != std::string::npos) {
+                        styleStr->replace(newlinePos, 1, "\n\t");
+                    }
+                }
+                ret += styleStr.value();
+                break;
+        }
+        if (param != style.getParams().back()) ret += ", ";
+    }
+    if (shouldIndentParams) ret += '\n'; 
+    if (!(style.getType() & FIXEDCOLOR)) ret += '>';
+    if (type & WRAPPER) ret += "()";
+
     return ret;
 }
 
 static std::optional<TokenizedStyle> tokenizeStyle(const std::string& styleStr) {
-    auto styleBegin{styleStr.find_first_not_of(" &\t\n")};
-    if (styleBegin == std::string::npos) {
-        Logger::warn("Could not tokenize style!", false);
-        return std::nullopt;
-    }
-    auto nameEnd{styleStr.find_first_of("<(", styleBegin)};
-    auto styleName{styleStr.substr(styleBegin, nameEnd - styleBegin)};
+    // Find all comments
+    std::vector<std::pair<size_t, size_t>> commentRanges;
+    size_t commentIndex{0};
+    while (!false) {
+        auto commentBegin{styleStr.find("/*", commentIndex)};
+        auto commentEnd{styleStr.find("*/", commentBegin)};
 
-    TokenizedStyle styleTokens;
-    styleTokens.name = styleName;
+        auto commentFound{commentBegin != std::string::npos || commentEnd != std::string::npos};
+        auto localCommentIndex{commentIndex};
 
-    if (nameEnd > styleStr.length() || styleStr.at(nameEnd) != '<') return styleTokens;
-
-    auto argSubStr{styleStr.substr(nameEnd + 1)};
-    std::string buf;
-    int32_t depth{1};
-    char c;
-    for (size_t i = 0; i < argSubStr.size(); i++) {
-        c = argSubStr.at(i);
-        if (c == ' ') continue;
-        if (c == '\n') continue;
-        if (c == '\t') continue;
-        if (c == '\r') continue;
-
-        if (c == '<') depth++;
-        else if (c == '>') {
-            depth--;
-            if (depth < 0) {
-                Logger::warn("Error parsing arguments for style: " + styleName);
+        if (commentFound) {
+            if (commentBegin == std::string::npos || commentEnd == std::string::npos) {
+                Logger::error("Mismatched block comment, aborting!");
                 return std::nullopt;
             }
-            if (depth == 0) {
-                styleTokens.args.push_back(buf);
+            commentRanges.emplace_back(commentBegin, commentEnd + 2);
+            localCommentIndex = commentEnd + 2;
+        }
+
+        commentBegin = styleStr.find("//", commentIndex);
+        commentFound |= commentBegin != std::string::npos;
+        if (commentBegin != std::string::npos) {
+            commentEnd = styleStr.find('\n', commentBegin);
+            commentRanges.emplace_back(commentBegin, commentEnd + 1);
+
+            if (commentEnd > localCommentIndex) localCommentIndex = commentEnd;
+        }
+
+        commentIndex = localCommentIndex;
+        if (!commentFound) break;
+    }
+
+    TokenizedStyle styleTokens;
+
+    // Find name
+    size_t nameEnd{0};
+    for (size_t i{0}; i < styleStr.length(); i++) {
+        // Jump over commentRanges
+        bool jumped{false};
+        for (const auto& [ cBegin, cEnd ] : commentRanges) {
+            if (i == cBegin) {
+                i = cEnd - 1; // compensate for i++ in loop
+                jumped = true;
                 break;
             }
         }
+        if (jumped) continue;
 
-        else if (c == ',' && depth == 1) {
-            styleTokens.args.push_back(buf);
+        char characer{styleStr.at(i)};
+
+        if (std::isalpha(characer) != 0) {
+            auto nameBegin{i};
+            while (std::isalnum(styleStr.at(i))) { i++; }
+            styleTokens.name = styleStr.substr(nameBegin, i - nameBegin);
+            nameEnd = i;
+            break;
+        }
+    }
+
+    if (styleTokens.name.empty()) {
+        Logger::error("Could not find style name/begin of style!");
+        return std::nullopt;
+    }
+    auto getCommentsInRange{[&commentRanges, &styleStr](size_t begin, size_t end) -> std::string {
+        std::string ret;
+        for (const auto& [ cBegin, cEnd ] : commentRanges) {
+            if (cEnd < begin) continue;
+            if (cBegin > end) break;
+
+            if (!ret.empty()) ret += '\n';
+            if (styleStr.at(cEnd - 1) == '/') { // is a block comment
+                ret += styleStr.substr(cBegin + 2, cEnd - cBegin - 4);
+            } else { // is a line comment
+                ret += styleStr.substr(cBegin + 2, cEnd - cBegin - 3);
+            }
+        }
+        return ret;
+    }};
+    styleTokens.comment = getCommentsInRange(0, nameEnd);
+
+    if (nameEnd > styleStr.length()) return styleTokens;
+
+    auto paramSubStr{styleStr.substr(nameEnd)};
+    size_t paramBegin{1}; // Skip over the < at nameEnd
+    size_t paramNameEnd{std::string::npos};
+    std::string buf;
+    int32_t depth{0};
+    char character{'\0'};
+    for (size_t i = 0; i < paramSubStr.size(); i++) {
+        // Jump over commentRanges
+        for (const auto& [ cBegin, cEnd ] : commentRanges) {
+            if (i + nameEnd == cBegin) i = cEnd - nameEnd;
+        }
+
+        character = paramSubStr.at(i);
+        if (character == ' ') continue;
+        if (character == '\n') continue;
+        if (character == '\t') continue;
+        if (character == '\r') continue;
+
+        if (character == '<') {
+            if (depth == 1 && paramNameEnd == std::string::npos) {
+                paramNameEnd = i;
+            } else if (depth == 0) {
+                buf.clear();
+                depth++;
+                continue;
+            }
+            depth++;
+        } else if (character == '>') {
+            depth--;
+            if (depth < 0) {
+                Logger::warn("Error parsing arguments for style: " + styleTokens.name);
+                return std::nullopt;
+            }
+            if (depth == 0) {
+                styleTokens.params.push_back({
+                        .rawStr = paramSubStr.substr(paramBegin, i - paramBegin),
+                        .paramStr = buf,
+                        .comments = getCommentsInRange(paramBegin + nameEnd, paramNameEnd + nameEnd),
+                        });
+                break;
+            }
+        } else if (character == ',' && depth == 1) {
+            styleTokens.params.push_back({
+                    .rawStr = paramSubStr.substr(paramBegin, i - paramBegin),
+                    .paramStr = buf,
+                    .comments = getCommentsInRange(paramBegin + nameEnd, paramNameEnd + nameEnd),
+                    });
             buf.clear();
+            paramBegin = i + 1;
             continue;
         }
 
-        buf += c;
+        buf += character;
     }
     if (depth != 0) {
-        Logger::warn("Mismatched <> in style: " + styleName);
+        Logger::warn("Mismatched <> in style: " + styleTokens.name);
         return std::nullopt;
     }
 

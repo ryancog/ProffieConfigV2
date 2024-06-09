@@ -141,9 +141,8 @@ void createToolbox(wxPanel* toolboxPanel, PCUI::MoveArea* moveArea) {
     toolboxBlocks = new std::vector<PCUI::Block*>;
 
     auto addStyleBlock{[&moveArea, &scrollSizer](const BladeStyles::StyleGenerator& generator) {
-        auto style{generator(nullptr, {})};
+        auto style{generator({})};
         auto block{new PCUI::StyleBlock(nullptr, toolbox, style)};
-        delete style;
 
         toolboxBlocks->push_back(block);
         block->collapse();
@@ -152,9 +151,7 @@ void createToolbox(wxPanel* toolboxPanel, PCUI::MoveArea* moveArea) {
             evt.Skip(false);
             if (!block->hitTest(evt.GetPosition())) return;
 
-            auto style{block->getStyle()};
-            auto newBlock{new PCUI::StyleBlock(moveArea, toolbox, style)};
-            delete style;
+            auto newBlock{new PCUI::StyleBlock(moveArea, toolbox, new BladeStyles::BladeStyle(*block->getStyle()))};
 
             newBlock->collapse(block->isCollapsed());
             newBlock->SetPosition(block->GetPosition());

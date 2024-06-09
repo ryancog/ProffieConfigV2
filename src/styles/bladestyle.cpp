@@ -20,6 +20,7 @@
  */
 
 #include "log/logger.h"
+#include "stylepreview/blade.h"
 #include "styles/elements/args.h"
 #include "styles/elements/colorstyles.h"
 #include "styles/elements/effects.h"
@@ -31,6 +32,7 @@
 #include "styles/elements/builtin.h"
 #include "styles/elements/wrappers.h"
 #include "styles/elements/transitions.h"
+#include "ui/bool.h"
 #include <algorithm>
 #include <cstdint>
 #include <variant>
@@ -38,17 +40,40 @@
 using namespace BladeStyles;
 
 BladeStyle::BladeStyle(
-            const char* osName, 
-            const char* humanName, 
-            const StyleType type,
-            const std::vector<Param*>& params,
-            const BladeStyle* parent
-            ) :
+        const char* osName, 
+        const char* humanName, 
+        const StyleType type,
+        const std::vector<Param*>& params) :
     osName(osName),
     humanName(humanName),
     type(type),
-    params(params),
-    parent(parent) {}
+    params(params) {}
+
+BladeStyle::BladeStyle(const BladeStyle& other) :
+    osName(other.osName),
+    humanName(other.osName),
+    type(other.type) {
+    params.clear();
+
+    for (const auto param : other.params) {
+        Param* newParam;
+        switch (param->getType() & FLAGMASK) {
+            case NUMBER:
+                newParam = new NumberParam(param->name, static_cast<const NumberParam*>(param)->getNum(), param->getType());
+                break;
+            case BITS:
+                newParam = new BitsParam(param->name, static_cast<const BitsParam*>(param)->getBits(), param->getType());
+                break;
+            case BOOL:
+                newParam = new BoolParam(param->name, static_cast<const BoolParam*>(param)->getBool(), param->getType());
+                break;
+            default:
+                newParam = new StyleParam(param->name, param->getType(), new BladeStyle(*static_cast<const StyleParam*>(param)->getStyle()));
+                break;
+        }
+        params.push_back(newParam);
+    }
+}
 
 BladeStyle::~BladeStyle() {
     for (auto param : params) {
@@ -104,13 +129,19 @@ bool BladeStyle::validateParams(std::string* err) const {
 }
 
 bool BladeStyle::setParams(const std::vector<ParamValue>& inParams) {
+    if (inParams.size() > params.size() && !(params.back()->getType() & VARIADIC)) return false;
+
+    for (size_t i{0}; i < inParams.size(); i++) {
+        if (i < params.size()) setParam(i, inParams.at(i));
+        else addParam(inParams.at(i));
+    }
 
     return true;
 }
 
 bool BladeStyle::setParam(size_t idx, const ParamValue& inParam) {
     if (idx >= params.size()) return false;
-    auto& param{*std::next(params.begin(), idx)};
+    auto& param{params.at(idx)};
 
     if (std::holds_alternative<BladeStyle*>(inParam)) {
         auto inStyle{std::get<BladeStyle*>(inParam)};
@@ -145,22 +176,66 @@ bool BladeStyle::setParam(size_t idx, const ParamValue& inParam) {
     return true;
 }
 
+bool BladeStyle::addParam(const ParamValue& newParam) {
+    auto& lastParam{params.back()};
+    if (~lastParam->getType() & VARIADIC) return false;
+
+    switch (lastParam->getType() & FLAGMASK) {
+        case NUMBER:
+        case BITS:
+        case BOOL:
+            if (!std::holds_alternative<int32_t>(newParam)) return false;
+            break;
+        case FUNCTION:
+        case FUNCTION3D:
+        case COLOR:
+        case LAYER:
+        case TRANSITION:
+        case TIMEFUNC: 
+        case EFFECT:
+        case LOCKUPTYPE:
+        case ARGUMENT:
+            if (!std::holds_alternative<BladeStyle*>(newParam)) return false;
+            if (!(std::get<BladeStyle*>(newParam)->getType() & lastParam->getType() & FLAGMASK)) return false;
+            break;
+    }
+
+    Param* param;
+    switch (lastParam->getType() & FLAGMASK) {
+        case NUMBER:
+            param = new NumberParam(lastParam->name, std::get<int32_t>(newParam), lastParam->getType());
+            break;
+        case BITS:
+            param = new BitsParam(lastParam->name, std::get<int32_t>(newParam), lastParam->getType());
+            break;
+        case BOOL:
+            param = new BoolParam(lastParam->name, std::get<int32_t>(newParam), lastParam->getType());
+            break;
+        case FUNCTION:
+        case FUNCTION3D:
+        case COLOR:
+        case LAYER:
+        case TRANSITION:
+        case TIMEFUNC: 
+        case EFFECT:
+        case LOCKUPTYPE:
+        case ARGUMENT:
+            param = new StyleParam(lastParam->name, lastParam->getType(), std::get<BladeStyle*>(newParam));
+            break;
+    }
+
+    params.push_back(param);
+    return true;
+}
+
 bool BladeStyle::removeParam(size_t idx) {
     if (idx >= params.size()) return false;
     auto it{std::next(params.begin(), idx)};
-    if (!((*it)->getType() & VARIADIC)) return false;
+    if (~(*it)->getType() & VARIADIC) return false;
 
     if (*it) delete (*it);
     params.erase(it);
     return true;
-}
-
-BladeStyle* BladeStyle::detachParam(size_t idx) {
-    if (idx >= params.size()) return nullptr;
-    auto param{*std::next(params.begin(), idx)};
-    if (!(param->getType() & STYLETYPE)) return nullptr;
-
-    return static_cast<StyleParam*>(param)->detach();
 }
 
 const std::vector<Param*>& BladeStyle::getParams() const {
@@ -190,18 +265,10 @@ void StyleParam::setStyle(BladeStyle* newStyle) {
 
 const BladeStyle* StyleParam::getStyle() const { return style; }
 
-BladeStyle* StyleParam::detach() {
+BladeStyle* StyleParam::detachStyle() {
     auto ret{style};
     style = nullptr;
     return ret;
-}
-
-LayerBaseParam::LayerBaseParam(const char* name, BladeStyle* const style, const BladeStyle* const* grandParent) :
-    StyleParam(name, COLOR | LAYER, style), grandParent(grandParent) {}
-
-StyleType LayerBaseParam::getType() const {
-    // TODO
-    return type;
 }
 
 NumberParam::NumberParam(const char* name, const StyleType initialValue, const StyleType additionalFlags) :

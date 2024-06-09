@@ -24,8 +24,8 @@
 
 using namespace BladeStyles;
 
-LayerStyle::LayerStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent) :
-    ColorStyle(osName, humanName, params, parent, BladeStyles::LAYER) {}
+LayerStyle::LayerStyle(const char* osName, const char* humanName, const std::vector<Param*>& params) :
+    ColorStyle(osName, humanName, params, BladeStyles::LAYER) {}
 
 StyleGenerator LayerStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};

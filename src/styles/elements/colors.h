@@ -33,13 +33,13 @@ class FixedColorStyle : ColorStyle {
 public:
 
     virtual void run(StylePreview::Blade&) override;
-    virtual ColorData getColor(int32_t led) const override;
+    virtual ColorData getColor(int32_t led) override;
 
     static StyleGenerator get(const std::string& styleName);
     static const StyleMap& getMap();
 
 protected:
-    FixedColorStyle(const char* osName, const char* humanName, const ColorData& color, const BladeStyle* parent);
+    FixedColorStyle(const char* osName, const char* humanName, const ColorData& color);
 
 private:
     static const StyleMap map;

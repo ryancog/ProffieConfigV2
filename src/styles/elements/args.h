@@ -80,7 +80,7 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    ArgumentStyle(const char* osName, const char* humanName, const Argument arg, const BladeStyle* parent);
+    ArgumentStyle(const char* osName, const char* humanName, const Argument arg);
 
 private:
     static const StyleMap map;

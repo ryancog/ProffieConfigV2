@@ -1,7 +1,4 @@
 #include "bool.h"
-#include "wx/gtk/tglbtn.h"
-#include "wx/gtk/tooltip.h"
-#include "wx/tglbtn.h"
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek
@@ -23,6 +20,8 @@
  */
 
 #include <wx/sizer.h>
+#include <wx/tglbtn.h>
+#include <wx/tooltip.h>
 
 using namespace PCUI;
 

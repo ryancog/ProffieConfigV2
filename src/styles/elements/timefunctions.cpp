@@ -26,8 +26,8 @@
 
 using namespace BladeStyles;
 
-TimeFunctionStyle::TimeFunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent) :
-    FunctionStyle(osName, humanName, params, parent, TIMEFUNC) {}
+TimeFunctionStyle::TimeFunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>& params) :
+    FunctionStyle(osName, humanName, params, TIMEFUNC) {}
 
 const StyleMap& TimeFunctionStyle::getMap() { return map; }
 
@@ -49,7 +49,7 @@ StyleGenerator TimeFunctionStyle::get(const std::string& styleName) {
 #define TIMEFUNC(osName, humanName, params, ...) \
     class osName : public TimeFunctionStyle { \
     public: \
-        osName(const BladeStyle* parent) : TimeFunctionStyle(#osName, humanName, params, parent) {} \
+        osName() : TimeFunctionStyle(#osName, humanName, params) {} \
         __VA_ARGS__ \
     }; 
 
@@ -59,9 +59,8 @@ public:
     TimeFunctionStyleW(
             const char* osName, 
             const char* humanName, 
-            const std::vector<Param*>& params, 
-            const BladeStyle* parent) :
-        TimeFunctionStyle(osName, humanName, params, parent), base(nullptr) {}
+            const std::vector<Param*>& params) :
+        TimeFunctionStyle(osName, humanName, params), base() {}
 
     virtual double bend(uint32_t time, uint32_t length, double scale) override { return base.bend(time, length, scale); }
     virtual int32_t getInt(int32_t led) override { return base.getInt(led); }
@@ -73,15 +72,15 @@ protected:
 #define TIMEFUNCW(osName, humanName, base, params, ...) \
     class osName : public TimeFunctionStyleW<base> { \
     public: \
-        osName(const BladeStyle* parent) : TimeFunctionStyleW(#osName, humanName, params, parent) {} \
+        osName() : TimeFunctionStyleW(#osName, humanName, params) {} \
         __VA_ARGS__ \
     };
 
 
 TIMEFUNC(BendTimePowX, "Exponential Time Bend",
         PARAMS(
-            new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, FunctionStyle::get("Int")(this, PARAMVEC(1000))),
-            new StyleParam("Power", FUNCTION, FunctionStyle::get("Int")(this, PARAMVEC(65536)))
+            new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, FunctionStyle::get("Int")(PARAMVEC(1000))),
+            new StyleParam("Power", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(65536)))
             ),
         RUN(blade) {
             auto timeParam{getParamStyle(0)};
@@ -123,7 +122,7 @@ TIMEFUNC(BendTimePowX, "Exponential Time Bend",
 
 TIMEFUNC(ReverseTimeX, "Reverse Time",
         PARAMS(
-            new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, FunctionStyle::get("Int")(this, PARAMVEC(1000)))
+            new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, FunctionStyle::get("Int")(PARAMVEC(1000)))
             ),
         RUN(blade) {
             auto timeParam{getParamStyle(0)};
@@ -152,14 +151,14 @@ TIMEFUNC(ReverseTimeX, "Reverse Time",
 
 TIMEFUNCW(BendTimePowInvX, "Inverse Exponential Time Bend", ReverseTimeX,
         PARAMS(
-            new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, FunctionStyle::get("Int")(this, PARAMVEC(1000))),
-            new StyleParam("Power", FUNCTION, FunctionStyle::get("Int")(this, PARAMVEC(65536)))
+            new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, FunctionStyle::get("Int")(PARAMVEC(1000))),
+            new StyleParam("Power", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(65536)))
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, TimeFunctionStyle::get("BendTimePowX")(&base, PARAMVEC()));
+            if (!base.getParamStyle(0)) base.setParam(0, TimeFunctionStyle::get("BendTimePowX")(PARAMVEC()));
             auto timeBendStyle{STYLECAST(TimeFunctionStyle, base.getParamStyle(0))};
 
-            if (timeBendStyle->getParamStyle(0)) timeBendStyle->setParam(0, TimeFunctionStyle::get("ReverseTimeX")(timeBendStyle, PARAMVEC()));
+            if (timeBendStyle->getParamStyle(0)) timeBendStyle->setParam(0, TimeFunctionStyle::get("ReverseTimeX")(PARAMVEC()));
             const_cast<BladeStyle*>(timeBendStyle->getParamStyle(0))->setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
             timeBendStyle->setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
             
@@ -173,8 +172,8 @@ TIMEFUNCW(BendTimePow, "Inverse Time Bend", BendTimePowX,
             new NumberParam("Power", 65536)
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(&base, PARAMVEC()));
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(&base, PARAMVEC()));
+            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
 
             const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
             const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
@@ -189,8 +188,8 @@ TIMEFUNCW(BendTimePowInv, "Inverse Exponential Time Bend", BendTimePowInvX,
             new NumberParam("Power", 65536)
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(&base, PARAMVEC()));
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(&base, PARAMVEC()));
+            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
 
             const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
             const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
@@ -204,7 +203,7 @@ TIMEFUNCW(ReverseTime, "Reverse Time", ReverseTimeX,
             new NumberParam("Millis", 1000)
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(&base, PARAMVEC()));
+            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
 
             const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
 

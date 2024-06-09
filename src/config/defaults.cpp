@@ -21,13 +21,14 @@
 
 #include "appcore/state.h"
 #include "prop/propfile.h"
+#include <limits>
 
 static void initializeSettings(Config::Data&);
 static void initializePropDefines(Config::PropMap&);
 static void initializeGeneralDefines(Config::Setting::DefineMap&);
 
 Config::Data* Config::Defaults::generateBlankConfig() {
-    auto config{new Config::Data};
+    auto *config{new Config::Data};
 
     initializeSettings(*config);
     initializePropDefines(config->propDefines);
@@ -59,8 +60,8 @@ static void initializeSettings(Config::Data& config)  {
                                   "NOT blade length, that is configured on the Blades page, only increase this if you have a longer blade,"
                                   "otherwise there's no need to change this setting.";
     config.maxLedsPerStrip.min = 1;
-    config.maxLedsPerStrip.max = 0xFFFF;
-    config.maxLedsPerStrip.value= 144;
+    config.maxLedsPerStrip.max = std::numeric_limits<uint16_t>::max();
+    config.maxLedsPerStrip.value = 144; // NOLINT(readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)
 }
 
 static void initializePropDefines(Config::PropMap& propDefines) {
@@ -119,7 +120,7 @@ static void initializeGeneralDefines(Config::Setting::DefineMap& generalDefines)
            entry->min = 0;
            entry->max = 10;
            entry->value = 3;
-           entry->increment = 0.1;
+           entry->increment = 0.1F; // NOLINT(readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers)
            )
     DEFINE(Numeric,
            entry->name = "PLI Timeout";

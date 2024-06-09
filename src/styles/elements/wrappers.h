@@ -32,7 +32,7 @@ public:
     static StyleGenerator get(const std::string& styleName);
 
 protected:
-    WrapperStyle(const char* osName, const char* humanName, const std::vector<Param*>&, const BladeStyle* parent);
+    WrapperStyle(const char* osName, const char* humanName, const std::vector<Param*>&);
 
 private:
     static const StyleMap map;

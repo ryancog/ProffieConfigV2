@@ -134,7 +134,7 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    EffectStyle(const char* osName, const char* humanName, const Effect effect, const BladeStyle* parent);
+    EffectStyle(const char* osName, const char* humanName, const Effect effect);
 
 private:
     static const StyleMap map;

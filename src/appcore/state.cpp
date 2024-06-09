@@ -21,10 +21,10 @@
 
 #include <fstream>
 
-#include "stylemanager/stylemanager.h"
-#include "prop/propfile.h"
-#include "pconf/pconf.h"
 #include "log/logger.h"
+#include "pconf/pconf.h"
+#include "prop/propfile.h"
+#include "stylemanager/stylemanager.h"
 
 static StyleManager::StyleMap* styles;
 static std::vector<std::string>* propFiles;
@@ -50,7 +50,7 @@ void AppCore::init() {
         return;
     }
 
-    PConf::Section* section;
+    PConf::Section* section{nullptr};
     while (!stateFile.eof()) {
         section = PConf::readSection(stateFile);
         if (!section) continue;

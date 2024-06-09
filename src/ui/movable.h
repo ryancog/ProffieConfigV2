@@ -45,6 +45,11 @@ public:
 
     Movable* getDragWindow() const { return dragWindow; }
 
+    /**
+     * @brief AdoptionRoutine functions take in a movable
+     * as well as it's screen position, test to see if they
+     * want to adopt the movable, and return true if so, false otherwise.
+    */
     typedef std::function<bool(Movable*, wxPoint)> AdoptionRoutine;
 
     void addAdoptRoutine(wxWindow* moveWin, AdoptionRoutine routine);

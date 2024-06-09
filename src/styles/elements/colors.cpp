@@ -134,12 +134,14 @@ using namespace BladeStyles;
     OS7_COLORS \
     OS8_COLORS \
 
-FixedColorStyle::FixedColorStyle(const char* osName, const char* humanName, const ColorData& color, const BladeStyle* parent) :
-    ColorStyle(osName, humanName, {}, parent), color(color) {}
+
+
+FixedColorStyle::FixedColorStyle(const char* osName, const char* humanName, const ColorData& color) :
+    ColorStyle(osName, humanName, {}, COLOR | FIXEDCOLOR), color(color) {}
 
 void FixedColorStyle::run(StylePreview::Blade&) {}
 
-ColorData FixedColorStyle::getColor(int32_t) const { return color; }
+ColorData FixedColorStyle::getColor(int32_t) { return color; }
 
 StyleGenerator FixedColorStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};
@@ -155,9 +157,9 @@ const StyleMap FixedColorStyle::map {
 #define CMAP(name, value) \
     { \
         name, \
-        [](const BladeStyle* parent, const std::vector<ParamValue>& params) -> BladeStyle* { \
+        [](const std::vector<ParamValue>& params) -> BladeStyle* { \
             if (params.size()) return nullptr; \
-            return new FixedColorStyle(name, name, value, parent); \
+            return new FixedColorStyle(name, name, value); \
         } \
     },
 

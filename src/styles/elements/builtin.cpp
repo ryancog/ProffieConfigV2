@@ -25,7 +25,7 @@
 using namespace BladeStyles;
 
 BuiltIn::BuiltIn(const char* osName, const char* humanName) :
-    ColorStyle(osName, humanName, {}, nullptr, BUILTIN) {}
+    ColorStyle(osName, humanName, {}, BUILTIN) {}
 
 const StyleMap& BuiltIn::getMap() { return map; }
 StyleGenerator BuiltIn::get(const std::string& styleName) {
@@ -35,7 +35,7 @@ StyleGenerator BuiltIn::get(const std::string& styleName) {
 }
 
 #define RUN(varname) virtual void run(StylePreview::Blade& varname) override
-#define GETCOLOR(varname) virtual ColorData getColor(int32_t varname) const override
+#define GETCOLOR(varname) virtual ColorData getColor(int32_t varname) override
 
 #define BUILTIN(osName, humanName, ...) \
     class osName : public BuiltIn { \
@@ -61,18 +61,7 @@ BUILTIN(style_pov, "POV Style",
         }
        )
 
-// Not sure if this is a good idea...
-#define BUILTINPAIR(style) { \
-    #style, \
-      [](const BladeStyle*, const std::vector<ParamValue>& paramArgs) -> BladeStyle* { \
-        auto ret{new style()}; \
-        if (!ret->setParams(paramArgs)) \
-          return nullptr; \
-        return ret; \
-      } \
-}
-
 const StyleMap BuiltIn::map{
-    BUILTINPAIR(style_charging),
-    BUILTINPAIR(style_pov)
+    STYLEPAIR(style_charging),
+    STYLEPAIR(style_pov)
 };

@@ -20,8 +20,8 @@
  */
 
 #include <fstream>
-#include <sstream>
 #include <optional>
+#include <sstream>
 
 #include "config/defaults.h"
 #include "log/logger.h"
@@ -42,13 +42,13 @@ static void writeTop(std::ostream&, Config::Data&);
 static void writeProp(std::ostream&, Config::Data&);
 
 Config::Data* Config::readConfig(const std::string& filename) {
-    auto configFile{std::ifstream(wxGetCwd().ToStdString() + CONFIGPATH + filename)};
+	auto configFile{std::ifstream(wxGetCwd().ToStdString() + CONFIGPATH + filename)};
     if (!configFile) {
         Logger::error("Config file \"" + filename + "\" could not be loaded!");
         return nullptr;
     }
 
-    auto config{Defaults::generateBlankConfig()};
+    auto *config{Defaults::generateBlankConfig()};
     std::string configBuffer;
     {
         std::string readBuf;
@@ -59,7 +59,7 @@ Config::Data* Config::readConfig(const std::string& filename) {
     struct Section {
         size_t begin{std::string::npos};
         size_t end{std::string::npos};
-        std::string contents{};
+        std::string contents;
     };
     enum {
         TOP,
@@ -70,7 +70,7 @@ Config::Data* Config::readConfig(const std::string& filename) {
         NUM_SECTS
     };
 
-    Section sections[NUM_SECTS];
+    std::array<Section, NUM_SECTS> sections;
     sections[TOP].begin 	= configBuffer.find(R"(#ifdef CONFIG_TOP)");
     sections[PROP].begin 	= configBuffer.find(R"(#ifdef CONFIG_PROP)");
     sections[PRESETS].begin = configBuffer.find(R"(#ifdef CONFIG_PRESETS)");
@@ -78,8 +78,8 @@ Config::Data* Config::readConfig(const std::string& filename) {
     sections[STYLES].begin 	= configBuffer.find(R"(#ifdef CONFIG_STYLES)");
 
     {
-        Section* orderedSects[NUM_SECTS]{nullptr};
-        bool ordered[NUM_SECTS]{false};
+        std::array<Section*, NUM_SECTS> orderedSects{nullptr};
+        std::array<bool, NUM_SECTS> ordered{false};
         for (int32_t orderIndex{0}; orderIndex < NUM_SECTS; orderIndex++) {
             for (int32_t sect{0}; sect < NUM_SECTS; sect++) {
                 if ((!orderedSects[orderIndex] || sections[sect].begin < orderedSects[orderIndex]->begin) && !ordered[sect]) {
@@ -132,12 +132,13 @@ void Config::writeConfig(const std::string& filename, Data& config) {
 static void pruneCustomDefines(Config::Data& config) {
     Config::CDefineMap::const_iterator define;
 #	define PRUNE(defineName, ...) { \
-        if ((define = config.customDefines.find(defineName)) != config.customDefines.end()) { \
+        define = config.customDefines.find(defineName); \
+        if (define != config.customDefines.end()) { \
             config.customDefines.erase(define); \
             __VA_ARGS__ \
         } \
     }
-#	define GETDEF(name, type) static_cast<Config::Setting::type<Config::Setting::DefineBase>*>(config.generalDefines.find(name)->second)
+#	define GETDEF(name, type) (static_cast<Config::Setting::type<Config::Setting::DefineBase>*>(config.generalDefines.find(name)->second))
 
     PRUNE("SAVE_STATE",
           GETDEF("SAVE_VOLUME", Numeric)->value = true;
@@ -187,7 +188,8 @@ static void readTop(std::istream& stream, Config::Data& config) {
 
         constexpr auto delims{" \t"};
 
-        auto definePos{buf.find_first_not_of(delims, buf.find("#define") + 7)};
+        constexpr const char* defineStr{"#define"};
+        auto definePos{buf.find_first_not_of(delims, buf.find(defineStr) + strlen(defineStr))};
         auto defineEnd{buf.find_first_of(delims, definePos)};
 
         auto valuePos{buf.find_first_not_of(delims, defineEnd)};
@@ -216,7 +218,7 @@ static void readTop(std::istream& stream, Config::Data& config) {
             static_cast<Selection<DefineBase>*>(define.value()->second)->value = true;
             break;
         case SettingType::NUMERIC: {
-            auto castDef{static_cast<Numeric<DefineBase>*>(define.value()->second)};
+            auto *castDef{static_cast<Numeric<DefineBase>*>(define.value()->second)};
             if (!std::isdigit(buf.at(valuePos))) {
                 Logger::info("Numeric define \"" + castDef->name + "\" has non-numeric value in config, skipping.");
                 continue;
@@ -225,7 +227,7 @@ static void readTop(std::istream& stream, Config::Data& config) {
             break;
         }
         case SettingType::DECIMAL: {
-            auto castDef{static_cast<Decimal<DefineBase>*>(define.value()->second)};
+            auto *castDef{static_cast<Decimal<DefineBase>*>(define.value()->second)};
             if (!std::isdigit(buf.at(valuePos))) {
                 Logger::info("Decimal define \"" + castDef->name + "\" has non-numeric value in config, skipping.");
                 continue;
@@ -247,15 +249,16 @@ static void readProp(std::istream& stream, Config::Data& config) {
 
         if (buf.find("#include") == std::string::npos) continue;
 
-        auto propStart{buf.find(R"("../props/)")};
-        auto propEnd{buf.rfind(R"(")")};
+        constexpr const char* propsPathStr{R"("../props/)"};
+        auto propStart{buf.find(propsPathStr)};
+        auto propEnd{buf.rfind('\"')};
 
         if (propStart == std::string::npos || propStart == propEnd) {
             Logger::info("Prop include malformed, skipping!");
             continue;
         }
 
-        config.selectedProp.value = buf.substr(propStart + 10, propEnd - propStart - 10);
+        config.selectedProp.value = buf.substr(propStart + strlen(propsPathStr), propEnd - propStart - strlen(propsPathStr));
         return;
     }
 }
@@ -286,27 +289,27 @@ static void writeTop(std::ostream& stream, Config::Data& config) {
     auto writeDefine{[&stream](Config::Setting::DefineBase& define) {
         switch (define.getType()) {
         case SettingType::TOGGLE: {
-            auto castDef{static_cast<Toggle<DefineBase>*>(&define)};
+            auto *castDef{static_cast<Toggle<DefineBase>*>(&define)};
             if (castDef->value && !castDef->isDisabled()) stream << "#define " << castDef->define << castDef->postfix << std::endl;
             break;
         }
         case SettingType::SELECTION: {
-            auto castDef{static_cast<Selection<DefineBase>*>(&define)};
+            auto *castDef{static_cast<Selection<DefineBase>*>(&define)};
             if (castDef->value && !castDef->isDisabled()) stream << "#define " << castDef->define << castDef->postfix << std::endl;
             break;
         }
         case SettingType::NUMERIC: {
-            auto castDef{static_cast<Numeric<DefineBase>*>(&define)};
+            auto *castDef{static_cast<Numeric<DefineBase>*>(&define)};
             if (!castDef->isDisabled()) stream << "#define " << castDef->define << " " << castDef->value << castDef->postfix << std::endl;
             break;
         }
         case SettingType::DECIMAL: {
-            auto castDef{static_cast<Decimal<DefineBase>*>(&define)};
+            auto *castDef{static_cast<Decimal<DefineBase>*>(&define)};
             if (!castDef->isDisabled()) stream << "#define " << castDef->define << " " << castDef->value << castDef->postfix << std::endl;
             break;
         }
         case SettingType::COMBO: {
-            auto castDef{static_cast<Combo<DefineBase>*>(&define)};
+            auto *castDef{static_cast<Combo<DefineBase>*>(&define)};
             if (!castDef->isDisabled()) stream << "#define " << castDef->define << " " << castDef->value << castDef->postfix << std::endl;
             break;
         }

@@ -40,7 +40,7 @@ public:
     static StyleGenerator get(const std::string& styleName);
 
 protected:
-    TimeFunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>&, const BladeStyle* parent);
+    TimeFunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>&);
 
 private:
     static const StyleMap map;
@@ -52,9 +52,7 @@ public:
   AddBend() : TimeFunctionStyle(
               "AddBend", 
               "SCARY",
-              PARAMS(new StyleParam("MILLIS", FUNCTION, nullptr)),
-              nullptr
-              ) {}
+              PARAMS(new StyleParam("MILLIS", FUNCTION, nullptr))) {}
 
   virtual void run(StylePreview::Blade& blade) override {
       millisStyle = const_cast<FunctionStyle*>(static_cast<const FunctionStyle*>(getParamStyle(0)));

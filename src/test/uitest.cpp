@@ -41,9 +41,9 @@ PCUI::Frame* Test::init() {
 
     // auto style{BladeStyles::get("Cylon")({})};
     // PCUI::Block* block{new PCUI::StyleBlock(moveArea, panel, *style)};
-    auto style = BladeStyles::get("StylePtr")(nullptr, {});
+    auto style = BladeStyles::get("StylePtr")({});
     auto block = new PCUI::StyleBlock(moveArea, panel, style);
-    style = BladeStyles::get("TrWipeSparkTipX")(nullptr, {});
+    style = BladeStyles::get("TrWipeSparkTipX")({});
     block = new PCUI::StyleBlock(moveArea, panel, style);
     // style = BladeStyles::get("AudioFlickerL")({});
     // block = new PCUI::StyleBlock(moveArea, panel, *style);

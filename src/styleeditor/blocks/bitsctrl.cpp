@@ -1,5 +1,4 @@
 #include "bitsctrl.h"
-#include "wx/gtk/textctrl.h"
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek

@@ -25,7 +25,7 @@
 namespace Logger {
 
 enum LogLevel : uint32_t {
-    ERROR,
+    ERROR = 1,
     WARN,
     INFO,
     DEBUG,

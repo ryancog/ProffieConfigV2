@@ -1,5 +1,6 @@
 #include "colorstyles.h"
 #include "styles/bladestyle.h"
+#include "styles/elements/colors.h"
 #include <cmath>
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
@@ -24,38 +25,6 @@
 
 using namespace BladeStyles;
 
-ColorData BladeStyles::mixColors(const ColorData& a, const ColorData& b, int32_t x, int32_t shift) {
-    return (a * ((1 << shift) - x) + (b * x)) >> shift;
-}
-
-bool ColorData::operator==(const ColorData& other) const {
-    return (red == other.red) && (green == other.green) && (blue == other.blue);
-}
-
-ColorData ColorData::operator*(uint16_t multiplier) const {
-    return ColorData{
-        .red = red * multiplier,
-        .green = green * multiplier,
-        .blue = blue * multiplier
-    };
-}
-
-ColorData ColorData::operator+(const ColorData& other) const {
-    return ColorData{
-        .red = red + other.red,
-        .green = green + other.green,
-        .blue = blue + other.blue
-    };
-}
-
-ColorData ColorData::operator>>(int32_t shift) const {
-    return ColorData{
-        .red = red >> shift,
-        .green = green >> shift,
-        .blue = blue >> shift,
-    };
-}
-
 const StyleMap& ColorStyle::getMap() { return map; }
 
 StyleGenerator ColorStyle::get(const std::string& name) {
@@ -64,10 +33,22 @@ StyleGenerator ColorStyle::get(const std::string& name) {
     return mapIt->second;
 }
 
-ColorStyle::ColorStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent, StyleType typeOverride) :
-    BladeStyle(osName, humanName, typeOverride ? typeOverride : COLOR, params, parent) {}
+ColorStyle::ColorStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, StyleType typeOverride) :
+    BladeStyle(osName, humanName, typeOverride ? typeOverride : COLOR, params) {}
 
-const StyleMap ColorStyle::map{
+#define CSTYLE(osName, humanName, params, ...) \
+    class osName : public ColorStyle { \
+    public: \
+        osName() : ColorStyle(#osName, humanName, params) {} \
+        __VA_ARGS__ \
+    }; 
+
+#define RUN(varname) \
+    virtual void run(StylePreview::Blade& (varname)) override
+
+#define GETCOLOR(varname) \
+    virtual ColorData getColor(const int32_t (varname)) override
+
  //        // Usage: AlphaL<COLOR, ALPHA>
  //        // COLOR: COLOR or LAYER
  //        // ALPHA: FUNCTION
@@ -98,19 +79,28 @@ const StyleMap ColorStyle::map{
  //                Input("Input", INTF),
  //                Input("Color #", COLORF | VARIADIC)),
 
- //        // Usage: AudioFlicker<A, B>
- //        // Or: AudioFlickerL<B>
- //        // A, B: COLOR
- //        // return value: COLOR
- //        // Mixes between A and B based on audio. Quiet audio
- //        // means more A, loud audio means more B.
- //        // Based on a single sample instead of an average to make it flicker.
+// Usage: AudioFlicker<A, B>
+// Or: AudioFlickerL<B>
+// A, B: COLOR
+// return value: COLOR
+// Mixes between A and B based on audio. Quiet audio
+// means more A, loud audio means more B.
+// Based on a single sample instead of an average to make it flicker.
  //        LAYER("AudioFlickerL", "Audio Flicker",
  //                Input("Flicker Color", COLORF | LAYERF)),
 
- //        STYLE("AudioFlicker", "Audio Flicker", 
- //                Input("Base Color", COLORF),
- //                Input("Flicker Color", COLORF | LAYERF)),
+    CSTYLE(AudioFlicker, "Audio Flicker",
+            PARAMS(
+                new StyleParam("Base Color", COLOR, nullptr),
+                new StyleParam("Flicker Color", COLOR | LAYER, nullptr),
+                ),
+            RUN(blade) {
+
+            }
+            GETCOLOR(led) {
+
+            }
+          )
 
  //        // NO DOCUMENTATION
  //        // BladeShortenerWrapper
@@ -359,36 +349,49 @@ const StyleMap ColorStyle::map{
  //                Input("Color #", COLORF | VARIADIC)
  //                ),
 
- //        // Usage: Cylon<COLOR, PERCENT, RPM>
- //        // or: ColorCycle<COLOR, PERCENT, RPM, ON_COLOR, ON_PERCENT, ON_RPM,
- //        // FADE_TIME_MILLIS, OFF_COLOR>
- //        // COLOR, ON_COLOR, OFF_COLOR: COLOR
- //        // RPM, PERCENT, ON_PERCENT, ON_RPM, FADE_TIME_MILLIS: a number
- //        // return value: COLOR
- //        // Cylon/Knight Rider effect, a section of the strip is
- //        // lit up and moves back and forth. Speed, color and fraction
- //        // illuminated can be configured separately for on and off
- //        // states.
- //        // The arguments for this style are divided into two groups of
- //        // { COLOR, PERCENT, RPM }, one for while the blade is OFF, and the other
- //        // while it's ON.
- //        // BASE_COLOR is the color of pixels not part of the lit section, so if
- //        // PERCENT
- //        // is 0, the entire blade will be BASE_COLOR, and if PERCENT is 100, the
- //        // entire blade
- //        // will be OFF_COLOR or ON_COLOR (depending on blade state).
- //        // FADE_TIME_MILLIS is the time taken to transition between the OFF and ON
- //        // groups
- //        // of values.
- //        STYLE("Cylon", "Cylon", 
- //                Input("Off Color", COLORF),
- //                Input("Off Size (%)", INT), 
- //                Input("Off RPM", INT),
- //                Input("On Color", COLORF | REFARG_1),
- //                Input("On Size (%)", INT | REFARG_2), 
- //                Input("On RPM", INT | REFARG_3),
- //                Input("Fade Time (ms)", INT, 1),
- //                Input("Base Color", COLORF, Color::BLACK)
- //                ),
+// Usage: Cylon<COLOR, PERCENT, RPM>
+// or: ColorCycle<COLOR, PERCENT, RPM, ON_COLOR, ON_PERCENT, ON_RPM,
+// FADE_TIME_MILLIS, OFF_COLOR>
+// COLOR, ON_COLOR, OFF_COLOR: COLOR
+// RPM, PERCENT, ON_PERCENT, ON_RPM, FADE_TIME_MILLIS: a number
+// return value: COLOR
+// Cylon/Knight Rider effect, a section of the strip is
+// lit up and moves back and forth. Speed, color and fraction
+// illuminated can be configured separately for on and off
+// states.
+// The arguments for this style are divided into two groups of
+// { COLOR, PERCENT, RPM }, one for while the blade is OFF, and the other
+// while it's ON.
+// BASE_COLOR is the color of pixels not part of the lit section, so if
+// PERCENT
+// is 0, the entire blade will be BASE_COLOR, and if PERCENT is 100, the
+// entire blade
+// will be OFF_COLOR or ON_COLOR (depending on blade state).
+// FADE_TIME_MILLIS is the time taken to transition between the OFF and ON
+// groups
+// of values.
+CSTYLE(Cylon, "Cylon",
+        PARAMS(
+            new StyleParam("Off Color", COLOR, nullptr),
+            new NumberParam("Off Size (%)"), 
+            new NumberParam("Off RPM"),
+            new StyleParam("On Color", COLOR | REFARG_1, nullptr),
+            new NumberParam("On Size (%)", 0, REFARG_2), 
+            new NumberParam("On RPM", 0, REFARG_3),
+            new NumberParam("Fade Time (ms)", 1),
+            new StyleParam("Base Color", COLOR, FixedColorStyle::get("BLACK")({}))
+            ),
+        RUN(blade) {
+
+        }
+        GETCOLOR(led) {
+
+        }
+        
+        )
+
+const StyleMap ColorStyle::map{
+    STYLEPAIR(Cylon),
+    STYLEPAIR(AudioFlicker),
 };
 

@@ -60,7 +60,7 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    FunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>&, const BladeStyle* parent, StyleType typeOverride = 0);
+    FunctionStyle(const char* osName, const char* humanName, const std::vector<Param*>&, StyleType typeOverride = 0);
 
 private:
     static const StyleMap map;
@@ -91,7 +91,7 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    Function3DStyle(const char* osName, const char* humanName, const std::vector<Param*>&, const BladeStyle* parent);
+    Function3DStyle(const char* osName, const char* humanName, const std::vector<Param*>&);
 
 private:
     static const StyleMap map;

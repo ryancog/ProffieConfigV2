@@ -48,9 +48,8 @@ MoveArea::MoveArea(
             wxPostEvent(this, newEvt);
             auto evtPos{ClientToScreen(evt.GetPosition())};
 
-            for (auto childIt{childStack.rbegin()}; childIt != childStack.rend(); childIt++) {
+            for (auto childIt{childStack.crbegin()}; childIt != childStack.crend(); childIt++) {
                 if (*childIt == dragWindow) continue;
-                if (!(*childIt)->routine) continue;
                 if (!(*childIt)->routine(dragWindow, evtPos)) continue;
 
                 addChildToStack(dragWindow);
@@ -59,7 +58,7 @@ MoveArea::MoveArea(
             }
             for (const auto& [ window, routine ] : adoptionRoutines) {
                 if (window == dragWindow) continue;
-                if (routine(dragWindow, ClientToScreen(evt.GetPosition()))) {
+                if (routine(dragWindow, evtPos)) {
                     addChildToStack(dragWindow);
                     dragWindow = nullptr;
                     return;
@@ -71,7 +70,7 @@ MoveArea::MoveArea(
     });
     Bind(MOVECLICK_FALLTHROUGH, [&](wxMouseEvent& evt) {
         bool testing{false};
-        for (auto childIt{childStack.rbegin()}; childIt != childStack.rend(); childIt++) {
+        for (auto childIt{childStack.crbegin()}; childIt != childStack.crend(); childIt++) {
             if (!testing) {
                 testing = (evt.GetEventObject() == *childIt);
                 continue;
@@ -101,13 +100,17 @@ void MoveArea::removeAdoptRoutine(wxWindow* window) {
 
 void MoveArea::addChildToStack(Movable* child) {
     childStack.push_back(child);
-    for (const auto cChild : child->GetChildren()) {
-        auto moveChild{dynamic_cast<Movable*>(cChild)};
-        if (moveChild) addChildToStack(moveChild);
+    for (const auto grandChild : child->GetChildren()) {
+        auto grandMoveChild{dynamic_cast<Movable*>(grandChild)};
+        if (grandMoveChild) addChildToStack(grandMoveChild);
     }
 }
 
 void MoveArea::removeChildFromStack(Movable* child) {
+    for (const auto grandChild : child->GetChildren()) {
+        auto grandMoveChild{dynamic_cast<Movable*>(grandChild)};
+        if (grandMoveChild) removeChildFromStack(grandMoveChild);
+    }
     for (auto childIt{childStack.cbegin()}; childIt != childStack.cend(); childIt++) {
         if (*childIt == child) {
             childStack.erase(childIt); 
@@ -158,7 +161,7 @@ void MovePanel::create(
     Create(parent, id, pos, size, style, objName);
     this->moveArea = moveArea;
     moveArea->addAdoptRoutine(this, [this](Movable* toAdopt, wxPoint mousePos) -> bool {
-        if (!hitTest(mousePos)) return false;
+        if (!hitTest(ScreenToClient(mousePos))) return false;
 
         auto winPos{toAdopt->GetScreenPosition()};
         toAdopt->Reparent(this);
@@ -172,10 +175,9 @@ MovePanel::~MovePanel() {
 }
 
 bool MovePanel::hitTest(wxPoint pos) const {
-    auto thisPos{GetScreenPosition()};
-    auto thisEdge{thisPos + GetSize()};
-    if (pos.x < thisPos.x || pos.y < thisPos.y) return false;
-    if (pos.x > thisEdge.x || pos.y > thisEdge.y) return false;
+    if (pos.x < 0 || pos.y < 0) return false;
+    auto size{GetSize()};
+    if (pos.x > size.x || pos.y > size.y) return false;
 
     return true;
 }
@@ -242,10 +244,9 @@ ScrolledMovePanel::~ScrolledMovePanel() {
 
 wxScrolledCanvas* ScrolledMovePanel::getCanvas() { return canvas; }
 bool ScrolledMovePanel::hitTest(wxPoint pos) const {
-    auto thisPos{canvas->GetScreenPosition()};
-    auto thisEdge{thisPos + canvas->GetSize()};
-    if (pos.x < thisPos.x || pos.y < thisPos.y) return false;
-    if (pos.x > thisEdge.x || pos.y > thisEdge.y) return false;
+    if (pos.x < 0 || pos.y < 0) return false;
+    auto size{GetSize()};
+    if (pos.x > size.x || pos.y > size.y) return false;
 
     return true;
 }
@@ -417,6 +418,7 @@ Movable::~Movable() {
     moveArea->removeChildFromStack(this);
 }
 
+
 bool Movable::hitTest(wxPoint point) const { 
     if (point.x < 0 || point.y < 0) return false;
     auto thisSize{GetSize()};
@@ -440,10 +442,6 @@ void Movable::doGrab(wxMouseEvent& evt) {
 
     auto startPos = this->GetScreenPosition();
     moveArea->removeChildFromStack(this);
-    for (const auto child : GetChildren()) {
-        auto moveChild{dynamic_cast<Movable*>(child)};
-        if (moveChild) moveArea->removeChildFromStack(moveChild);
-    }
     moveArea->dragWindow = this;
     moveArea->calcDelta(nullptr);
     moveArea->CaptureMouse();

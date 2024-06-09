@@ -21,7 +21,6 @@
 
 #include <cstdint>
 #include <variant>
-#include <list>
 #include <vector>
 #include <string>
 #include <map>
@@ -30,15 +29,19 @@ namespace BladeStyles {
 
 typedef uint32_t StyleType;
 enum : StyleType {
-    VARIADIC	= 0b1000000000000000,
+    // Flags
+    VARIADIC	= 0b1000000000000000U << 16,
+    FIXEDCOLOR	= 0b0100000000000000U << 16,
 
-    WRAPPER		= 0b0000000000000001,
-    BUILTIN		= 0b0000000000000010,
-    FUNCTION	= 0b0000000000000100,
-    FUNCTION3D  = 0b0000000000001000,
-    NUMBER      = 0b0000000000010000,
-    BITS		= 0b0000000000100000,
-    BOOL		= 0b0000000001000000,
+    // Types
+    NUMBER      = 0b0000000000000001,
+    BITS		= 0b0000000000000010,
+    BOOL		= 0b0000000000000100,
+
+    WRAPPER		= 0b0000000000001000,
+    BUILTIN		= 0b0000000000010000,
+    FUNCTION	= 0b0000000000100000,
+    FUNCTION3D  = 0b0000000001000000,
     COLOR 		= 0b0000000010000000,
     LAYER       = 0b0000000100000000,
     TRANSITION	= 0b0000001000000000,
@@ -47,18 +50,20 @@ enum : StyleType {
     LOCKUPTYPE	= 0b0001000000000000,
     ARGUMENT    = 0b0010000000000000,
 
-    REFARG_1	= 1 << 16,
-    REFARG_2	= 2 << 16,
-    REFARG_3	= 3 << 16,
-    REFARG_4	= 4 << 16,
-    REFARG_5	= 5 << 16,
-    REFARG_6	= 6 << 16,
-    REFARG_7	= 7 << 16,
-    REFARG_8	= 8 << 16,
+    // Refs
+    REFARG_1	= 1U << 28,
+    REFARG_2	= 2U << 28,
+    REFARG_3	= 3U << 28,
+    REFARG_4	= 4U << 28,
+    REFARG_5	= 5U << 28,
+    REFARG_6	= 6U << 28,
+    REFARG_7	= 7U << 28,
+    REFARG_8	= 8U << 28,
     // Could go up to 15, but I don't feel like putting all those here right now
-    REFMASK		= 0b1111 << 16,
+    REFMASK		= 0b1111U << 28,
 
-    FLAGMASK	= ~(VARIADIC | REFMASK),
+    // Masks & Stuff
+    FLAGMASK	= ~(VARIADIC | FIXEDCOLOR | REFMASK),
     // If this type uses a BladeStyle base
     STYLETYPE   = (
             WRAPPER | 
@@ -85,24 +90,18 @@ typedef std::variant<int32_t, BladeStyle*> ParamValue;
 
 class BladeStyle {
 public:
+    BladeStyle(const BladeStyle&);
     virtual ~BladeStyle();
 
     virtual StyleType getType() const;
 
     bool setParams(const std::vector<ParamValue>&);
     bool setParam(size_t idx, const ParamValue&);
+    bool addParam(const ParamValue&);
     /**
      * Used to remove variadic args
      */
     bool removeParam(size_t idx);
-    /**
-     * WARNING! Make sure the param is held elsewhere,
-     * otherwise this is a memory leak.
-     * This is only valid for StyleParams
-     *
-     * Use setParam w/ nullptr instead if the goal is to clear things out.
-     */
-    BladeStyle* detachParam(size_t idx);
 
     const std::vector<Param*>& getParams() const;
     const Param* getParam(size_t idx) const;
@@ -131,26 +130,25 @@ public:
 
     const char* osName;
     const char* humanName;
+    std::string comment;
 
 protected:
     BladeStyle(
             const char* osName, 
             const char* humanName, 
             const StyleType type,
-            const std::vector<Param*>& params,
-            const BladeStyle* parent
+            const std::vector<Param*>& params
             );
 
     const StyleType type;
 
 private:
     std::vector<Param*> params{};
-    const BladeStyle* parent;
 };
 
 class Param {
 public:
-    Param(const char* name, StyleType type);
+    Param(const Param&) = delete;
     virtual ~Param();
 
     virtual StyleType getType() const;
@@ -158,33 +156,28 @@ public:
     const char* name;
 
 protected:
+    Param(const char* name, StyleType type);
+
     const StyleType type;
 };
 
 class StyleParam : public Param {
 public:
+    StyleParam(const StyleParam&) = delete;
     StyleParam(const char* name, StyleType type, BladeStyle* style);
-    ~StyleParam();
+    virtual ~StyleParam() override;
 
     void setStyle(BladeStyle*);
     const BladeStyle* getStyle() const;
     /**
      * Clear pointer, return style
+     *
+     * Must acquire otherwise memory leak.
      */
-    BladeStyle* detach();
+    [[nodiscard]] BladeStyle* detachStyle();
 
 private:
     BladeStyle* style;
-};
-
-class LayerBaseParam : public StyleParam {
-public:
-    LayerBaseParam(const char* name, BladeStyle* style, const BladeStyle* const* grandParent = nullptr);
-
-    virtual StyleType getType() const override;
-
-private:
-    const BladeStyle* const* grandParent;
 };
 
 class NumberParam : public Param {
@@ -237,7 +230,7 @@ inline bool BladeStyle::getParamBool(size_t idx) const {
     return static_cast<const BoolParam*>(getParam(idx))->getBool();
 }
 
-typedef BladeStyle* (*StyleGenerator)(const BladeStyle*, const std::vector<ParamValue>&);
+typedef BladeStyle* (*StyleGenerator)(const std::vector<ParamValue>&);
 typedef std::map<std::string, StyleGenerator> StyleMap;
 
 StyleGenerator get(const std::string& styleName);
@@ -248,9 +241,12 @@ StyleGenerator get(const std::string& styleName);
 #define PARAMVEC(...) std::vector<ParamValue>{ __VA_ARGS__ }
 #define STYLEPAIR(name) { \
     #name, \
-    [](const BladeStyle* parent, const std::vector<ParamValue>& paramArgs) -> BladeStyle* { \
-        auto ret{new name(parent)}; \
-        if (!ret->setParams(paramArgs)) return nullptr; \
+    [](const std::vector<ParamValue>& paramArgs) -> BladeStyle* { \
+        auto ret{new name()}; \
+        if (!ret->setParams(paramArgs)) { \
+            delete ret; \
+            return nullptr; \
+        } \
         return ret; \
     } \
 }

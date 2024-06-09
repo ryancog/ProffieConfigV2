@@ -24,8 +24,8 @@
 
 using namespace BladeStyles;
 
-LockupTypeStyle::LockupTypeStyle(const char* osName, const char* humanName, const LockupType lockType, const BladeStyle* parent) :
-    BladeStyle(osName, humanName, LOCKUPTYPE, {}, parent), lockupType(lockType) {}
+LockupTypeStyle::LockupTypeStyle(const char* osName, const char* humanName, const LockupType lockType) :
+    BladeStyle(osName, humanName, LOCKUPTYPE, {}), lockupType(lockType) {}
 
 StyleGenerator LockupTypeStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};
@@ -39,9 +39,9 @@ const StyleMap LockupTypeStyle::map{
 #define LTMAP(enum, osName, humanName) \
     { \
         osName, \
-        [](const BladeStyle* parent, const std::vector<ParamValue>& params) -> BladeStyle* { \
+        [](const std::vector<ParamValue>& params) -> BladeStyle* { \
             if (params.size()) return nullptr; \
-            return new LockupTypeStyle(osName, humanName, LockupType::enum, parent); \
+            return new LockupTypeStyle(osName, humanName, LockupType::enum); \
         } \
     },
 

@@ -26,13 +26,19 @@
 namespace Config {
 
 struct Data;
-typedef std::unordered_map<std::string, Setting::DefineMap*> PropMap;
-typedef std::unordered_map<std::string, std::string> CDefineMap;
+using PropMap = std::unordered_map<std::string, Setting::DefineMap *>;
+using CDefineMap = std::unordered_map<std::string, std::string>;
 
 Data* readConfig(const std::string& filename);
 void writeConfig(const std::string& filename, Data& config);
 
 struct Data {
+    Data() = default;
+    Data(const Data&) = default;
+    Data(Data&&) = delete;
+    Data& operator=(const Data&) = default;
+    Data& operator=(Data&&) = delete;
+
     Setting::Combo<Setting::SettingBase> proffieboard;
     Setting::Combo<Setting::SettingBase> selectedProp;
 
@@ -43,8 +49,8 @@ struct Data {
     Setting::Numeric<Setting::SettingBase> maxLedsPerStrip;
 
     ~Data() {
-        for (auto& propDef : propDefines) if (propDef.second) delete propDef.second;
+        for (auto& propDef : propDefines) delete propDef.second;
     }
 };
 
-}
+} // namespace Config

@@ -39,17 +39,17 @@ public:
     /**
      * Get color per led
      */
-    virtual ColorData getColor(int32_t) const = 0;
+    virtual ColorData getColor(int32_t) = 0;
 
     static StyleGenerator get(const std::string& styleName);
     static const StyleMap& getMap();
 
 protected:
-    ColorStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, const BladeStyle* parent, StyleType typeOverride = 0);
+    ColorStyle(const char* osName, const char* humanName, const std::vector<Param*>& params, StyleType typeOverride = 0);
 
 private:
     static const StyleMap map;
 };
 
 
-}
+} // namespace BladeStyles

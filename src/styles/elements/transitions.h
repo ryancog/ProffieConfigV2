@@ -101,7 +101,7 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    TransitionStyle(const char* osName, const char* humanName, const std::vector<Param*>&, const BladeStyle* parent);
+    TransitionStyle(const char* osName, const char* humanName, const std::vector<Param*>&);
 
 private:
     static const StyleMap map;

@@ -24,8 +24,8 @@
 
 using namespace BladeStyles;
 
-ArgumentStyle::ArgumentStyle(const char* osName, const char* humanName, const Argument arg, const BladeStyle* parent) :
-    BladeStyle(osName, humanName, ARGUMENT, {}, parent), arg(arg) {}
+ArgumentStyle::ArgumentStyle(const char* osName, const char* humanName, const Argument arg) :
+    BladeStyle(osName, humanName, ARGUMENT, {}), arg(arg) {}
 
 StyleGenerator ArgumentStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};
@@ -39,9 +39,9 @@ const StyleMap ArgumentStyle::map {
 #define AMAP(enum, str, humanStr) \
     { \
         str, \
-        [](const BladeStyle* parent, const std::vector<ParamValue>& params) -> BladeStyle* { \
+        [](const std::vector<ParamValue>& params) -> BladeStyle* { \
             if (params.size()) return nullptr; \
-            return new ArgumentStyle(str, humanStr, Argument::enum, parent); \
+            return new ArgumentStyle(str, humanStr, Argument::enum); \
         } \
     },
 
