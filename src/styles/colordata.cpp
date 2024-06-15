@@ -22,8 +22,8 @@
 
 using namespace BladeStyles;
 
-ColorData BladeStyles::mixColors(const ColorData& a, const ColorData& b, int32_t x, int32_t shift) {
-    return (a * ((1 << shift) - x) + (b * x)) >> shift;
+ColorData BladeStyles::mixColors(const ColorData& colorA, const ColorData& colorB, int32_t weight, int32_t shift) {
+    return (colorA * ((1 << shift) - weight) + (colorB * weight)) >> shift;
 }
 
 bool ColorData::operator==(const ColorData& other) const {

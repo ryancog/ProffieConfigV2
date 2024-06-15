@@ -21,33 +21,33 @@
 
 #include <fstream>
 
-#include <wx/splitter.h>
-#include <wx/treectrl.h>
 #include <wx/gdicmn.h>
 #include <wx/sizer.h>
+#include <wx/splitter.h>
 #include <wx/stattext.h>
+#include <wx/treectrl.h>
 
 #include "appcore/interfaces.h"
 #include "log/logger.h"
-#include "ui/frame.h"
 #include "pconf/pconf.h"
 #include "styles/bladestyle.h"
+#include "ui/frame.h"
 
 using namespace BladeStyles;
 
 struct DocInfo {
     std::string humanName;
-    std::string osName{};
+    std::string osName;
     uint32_t type{0};
-    std::string description{};
+    std::string description;
     
     struct ArgInfo {
         std::string name;
         uint32_t type{0};
-        std::string description{};
+        std::string description;
     };
     
-    std::vector<ArgInfo> args{};
+    std::vector<ArgInfo> args;
 };
 
 static PCUI::Frame* frame{nullptr};
@@ -80,7 +80,7 @@ void generateDocs() {
 
     docMap = new std::unordered_map<std::string, DocInfo>;
     
-    constexpr const char* docFiles[]{
+    constexpr std::array<const char*, 2> DOC_FILES{
         "functions.pconf",
         "transitions.pconf",
     };
@@ -95,7 +95,7 @@ void generateDocs() {
     }};
 
     std::ifstream docFile; 
-    for (const auto& file : docFiles) {
+    for (const auto& file : DOC_FILES) {
         docFile.open(wxGetCwd().ToStdString() + RESOURCEPATH "styledocs/" + file);
         if (!docFile.is_open()) {
             Logger::warn(std::string("Failed to open StyleDoc file: ") + file);
@@ -104,7 +104,7 @@ void generateDocs() {
         Logger::info(std::string("Reading StyleDoc: ") + file);
 
         while (docFile.peek() != EOF) {
-            auto sect{PConf::readSection(docFile)};
+            auto *sect{PConf::readSection(docFile)};
             if (!sect) {
                 Logger::info("Stray entry in StyleDoc file.");
                 continue;
@@ -119,9 +119,12 @@ void generateDocs() {
             }
 
             DocInfo info{
-                .humanName = sect->label.value()
+                .humanName = sect->label.value(),
+                .osName{},
+                .description{},
+                .args{},
             };
-            for (auto entry : sect->entries) {
+            for (auto *entry : sect->entries) {
                 if (!entry->value) {
                     Logger::warn("Stray entry without value in element: " + info.humanName);
                     continue;
@@ -136,7 +139,7 @@ void generateDocs() {
                         continue;
                     }
 
-                    for (const auto arg : static_cast<PConf::Section*>(entry)->entries) {
+                    for (auto *const arg : static_cast<PConf::Section*>(entry)->entries) {
                         if (!arg->label) {
                             Logger::warn("Argument with missing name in element: " + info.humanName);
                             continue;
@@ -148,8 +151,9 @@ void generateDocs() {
 
                         DocInfo::ArgInfo argInfo{
                             .name = arg->label.value(),
+                            .description{},
                         };
-                        for (const auto argEntry : static_cast<PConf::Section*>(arg)->entries) {
+                        for (auto *const argEntry : static_cast<PConf::Section*>(arg)->entries) {
                             if (!arg->value) {
                                 Logger::warn("Missing value for entry \"" + argEntry->name + "\" in argument \"" + arg->name + "\" for element: " + info.humanName);
                                 continue;
@@ -184,9 +188,10 @@ void generateTree(wxTreeCtrl* treeCtrl) {
             case LAYER:
                 category = layerNode;
                 break;
-            // case INT:
-                // category = funcNode;
-                // break;
+            case FUNCTION:
+            case FUNCTION3D:
+                category = funcNode;
+                break;
             case TRANSITION:
                 category = transNode;
                 break;
@@ -204,25 +209,28 @@ void generateTree(wxTreeCtrl* treeCtrl) {
 }
 
 void createUI() {
-    auto splitter{new wxSplitterWindow(frame, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_3D | wxSP_LIVE_UPDATE)};
+    constexpr auto TREE_MIN_WIDTH{100};
+    auto *splitter{new wxSplitterWindow(frame, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_3D | wxSP_LIVE_UPDATE)};
 
-    auto treeView{new wxTreeCtrl(splitter, wxID_ANY)};
+    auto *treeView{new wxTreeCtrl(splitter, wxID_ANY)};
     generateTree(treeView);
 
     docPanel = new wxPanel(splitter, wxID_ANY);
     docPanel->SetSizer(new wxBoxSizer(wxVERTICAL));
 
     splitter->SplitVertically(treeView, docPanel);
-    splitter->SetMinimumPaneSize(100);
+    splitter->SetMinimumPaneSize(TREE_MIN_WIDTH);
 }
 
+static constexpr auto TOP_PADDING{20};
+
 void Documentation::showPage(const std::string& styleName) {
-    auto docSizer{docPanel->GetSizer()};
+    auto *docSizer{docPanel->GetSizer()};
     docSizer->Clear(true);
 
     auto docInfo{docMap->find(styleName)};
     if (docInfo == docMap->end()) {
-        docSizer->AddSpacer(20);
+        docSizer->AddSpacer(TOP_PADDING);
         docSizer->Add(new wxStaticText(docPanel, wxID_ANY, "Sorry, this documentation doesn't exist yet!"), wxSizerFlags(0).Center());
         return;
     }
@@ -231,9 +239,9 @@ void Documentation::showPage(const std::string& styleName) {
 }
 
 void Documentation::goHome() {
-    auto docSizer{docPanel->GetSizer()};
+    auto *docSizer{docPanel->GetSizer()};
     docSizer->Clear(true);
 
-    docSizer->AddSpacer(20);
+    docSizer->AddSpacer(TOP_PADDING);
     docSizer->Add(new wxStaticText(docPanel, wxID_ANY, "Welcome to the ProffieConfig StyleDocs!"), wxSizerFlags(0).Center());
 }

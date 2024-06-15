@@ -1,4 +1,4 @@
-#include "time.h"
+#include "time.h" // NOLINT Hah, it thinks it's <ctime>
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek

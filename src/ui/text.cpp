@@ -19,29 +19,30 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <wx/sizer.h>
-#include <wx/panel.h>
-#include <wx/stattext.h>
 #include <wx/combobox.h>
+#include <wx/panel.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
 #include <wx/tooltip.h>
 
 using namespace PCUI;
 
 Text::Text(
-    wxWindow* parent,
-    int32_t id,
-    const wxString& label,
-    const wxString& initial,
-    const wxSize& size,
-    int32_t style,
-    const wxOrientation& orient) :
-    wxPanel(parent, id, wxDefaultPosition, size)
+    wxWindow *parent,
+    wxWindowID winID,
+    const wxString &label,
+    const wxString &initial,
+    const wxSize &size,
+    int64_t style,
+    wxOrientation orient) :
+    wxPanel(parent, winID, wxDefaultPosition, size)
 {
-    auto sizer{new wxBoxSizer(orient)};
+    auto *sizer{new wxBoxSizer(orient)};
+    constexpr auto PADDING{5};
 
     if (!label.empty()) {
         mText = new wxStaticText(this, wxID_ANY, label);
-        auto sizerFlags{wxSizerFlags(0).Border(wxLEFT | wxRIGHT, 5)};
+        auto sizerFlags{wxSizerFlags(0).Border(wxLEFT | wxRIGHT, PADDING)};
         sizer->Add(mText, orient == wxHORIZONTAL ? sizerFlags.Center() : sizerFlags);
     }
 
@@ -57,7 +58,7 @@ Text::Text(
 }
 
 void Text::setToolTip(wxToolTip* tip) {
-    SetToolTip(tip);
+    SetToolTip(tip->GetTip());
     mEntry->SetToolTip(new wxToolTip(tip->GetTip()));
     if (mText) mText->SetToolTip(new wxToolTip(tip->GetTip()));
 }

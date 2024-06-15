@@ -34,8 +34,8 @@ StyleGenerator BuiltIn::get(const std::string& styleName) {
     return mapIt->second;
 }
 
-#define RUN(varname) virtual void run(StylePreview::Blade& varname) override
-#define GETCOLOR(varname) virtual ColorData getColor(int32_t varname) override
+#define RUN(varname) virtual void run(StylePreview::Blade& (varname)) override
+#define GETCOLOR(varname) virtual ColorData getColor(int32_t (varname)) override
 
 #define BUILTIN(osName, humanName, ...) \
     class osName : public BuiltIn { \

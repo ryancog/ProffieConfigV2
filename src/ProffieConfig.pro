@@ -10,6 +10,7 @@ DEFINES += VERSION=\\\"$$VERSION\\\"
 
 linux: {
 RESOURCEPATH=\\\"/resources/\\\"
+INCLUDEPATH += /usr/local/include/wx-3.3/
 }
 macx: {
 RESOURCEPATH=\\\"/../Resources/\\\"
@@ -19,10 +20,10 @@ RESOURCEPATH=\\\"/resources/\\\"
 DEFINES += wxProgressDialog=wxGenericProgressDialog
 DEFINES += wxMessageDialog=wxGenericMessageDialog
 DEFINES += wxAboutBox=wxGenericAboutBox
-INCLUDEPATH += /opt/mxe/usr/x86_64-w64-mingw32.static/include
+INCLUDEPATH += /opt/mxe/usr/x86_64-w64-mingw32.static/include/wx-3.3/
+INCLUDEPATH += /opt/mxe/usr/x86_64-w64-mingw32.static/include/gtk-3.0/
+INCLUDEPATH += /opt/mxe/usr/x86_64-w64-mingw32.static/include/glib-2.0/
 }
-
-INCLUDEPATH += /usr/local/include/wx-3.3
 
 DEFINES += RESOURCEPATH=$$RESOURCEPATH
 DEFINES += PROPPATH="$$RESOURCEPATH\ \\\"props/\\\""
@@ -45,7 +46,7 @@ RC_DEFINES += VERSION=\\\"$$VERSION\\0\\\" WIN_VERSION=$$replace(VERSION, "\.", 
 RC_INCLUDEPATH = /opt/mxe/usr/x86_64-w64-mingw32.static/include/wx-3.3/
 RC_FILE += ./ProffieConfig_resource.rc
 
-LIBS += $$system(wx-config --libs all)
+LIBS += $$system(wx-config --libs)
 
 SOURCES += \
     main.cpp \
@@ -55,14 +56,13 @@ SOURCES += \
     config/settings.cpp \
     log/logger.cpp \
     pconf/pconf.cpp \
+    proffieconstructs/utilfuncs.cpp \
     prop/propfile.cpp \
     proffieconstructs/range.cpp \
     proffieconstructs/vector3d.cpp \
-    stylepreview/webview.cpp \
     stylepreview/blade.cpp \
     styleeditor/styleeditor.cpp \
     styleeditor/blocks/bitsctrl.cpp \
-    styleeditor/blocks/block.cpp \
     styleeditor/blocks/styleblock.cpp \
     stylemanager/stylemanager.cpp \
     styles/bladestyle.cpp \
@@ -106,10 +106,8 @@ HEADERS += \
     proffieconstructs/range.h \
     proffieconstructs/utilfuncs.h \
     proffieconstructs/vector3d.h \
-    stylepreview/webview.h \
     stylepreview/blade.h \
     styleeditor/styleeditor.h \
-    styleeditor/blocks/block.h \
     styleeditor/blocks/styleblock.h \
     stylemanager/stylemanager.h \
     styles/parse.h \

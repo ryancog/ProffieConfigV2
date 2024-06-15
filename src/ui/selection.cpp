@@ -19,24 +19,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <wx/sizer.h>
 #include <wx/panel.h>
-#include <wx/stattext.h>
 #include <wx/radiobut.h>
+#include <wx/sizer.h>
+#include <wx/stattext.h>
 #include <wx/tooltip.h>
 
 using namespace PCUI;
 
 Selection::Selection(
     wxWindow* parent,
-    int32_t id,
+    wxWindowID winID,
     const wxString& label,
     const wxSize& size,
-    int32_t style,
-    const wxOrientation& orient) :
-    wxPanel(parent, id, wxDefaultPosition, size)
+    int64_t style,
+    wxOrientation orient) :
+    wxPanel(parent, winID, wxDefaultPosition, size)
 {
-    auto sizer{new wxBoxSizer(orient)};
+    auto *sizer{new wxBoxSizer(orient)};
 
     // if (!label.empty()) {
     //     mText = new wxStaticText(this, wxID_ANY, label);
@@ -56,7 +56,7 @@ Selection::Selection(
 }
 
 void Selection::setToolTip(wxToolTip* tip) {
-    SetToolTip(tip);
+    SetToolTip(tip->GetTip());
     mEntry->SetToolTip(new wxToolTip(tip->GetTip()));
     if (mText) mText->SetToolTip(new wxToolTip(tip->GetTip()));
 }

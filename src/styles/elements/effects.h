@@ -134,10 +134,10 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    EffectStyle(const char* osName, const char* humanName, const Effect effect);
+    EffectStyle(const char* osName, const char* humanName, Effect effect);
 
 private:
     static const StyleMap map;
 };
 
-}
+} // namespace BladeStyles

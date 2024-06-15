@@ -20,23 +20,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
+
 #include "proffieconstructs/vector3d.h"
+#include "proffieconstructs/utilfuncs.h"
 #include "stylepreview/blade.h"
 #include "styles/bladestyle.h"
-#include "styles/elements/args.h"
 #include "styles/elements/effects.h"
-#include "styles/elements/lockuptype.h"
 #include "utility/time.h"
-#include <cmath>
 
 using namespace BladeStyles;
 
-static constexpr uint8_t blastHump[32]{
+static constexpr std::array<uint8_t, 32> BLAST_HUMP{
     255, 255, 252, 247, 240, 232, 222, 211,
     199, 186, 173, 159, 145, 132, 119, 106,
     94,   82,  72,  62,  53,  45,  38,  32,
     26,   22,  18,  14,  11,   9,   7,   5
 };
+
+static constexpr std::array<uint8_t, 33> BUMP_SHAPE{
+    255, 255, 252, 247, 240, 232, 222, 211,
+    199, 186, 173, 159, 145, 132, 119, 106,
+    94,  82,  72,  62,  53,  45,  38,  32,
+    26,  22,  18,  14,  11,   9,   7,   5, 0
+};
+
 /*
  * For the ones that make sense to be boolean output, TRUE is 32768 and FALSE is 0
  * For those that return a range, the range is nearly always 0 to 32768, same goes
@@ -198,12 +209,12 @@ FUNC(BlastF, "Blast",
             for (const auto& effect : effects) {
                 if (effect.type != thisEffect) continue;
                 auto timeDelta{Utility::getTimeMicros() - effect.startMicros};
-                // No clue what "M" means...
-                auto M{1000 - (timeDelta / fadeTime)};
-                if (M > 0) {
+                constexpr auto SCALE{1000};
+                auto fadeFactor{SCALE - (timeDelta / fadeTime)};
+                if (fadeFactor > 0) {
                     auto dist{fabsf(effect.location - (led / static_cast<float>(numLeds)))};
-                    auto N{static_cast<uint32_t>(fabsf(dist - (timeDelta / (waveTime * 1000.f))) * waveSize)};
-                    if (N <= 32) mix += (blastHump[N] * M) / 1000;
+                    auto index{static_cast<uint32_t>(fabsf(dist - (timeDelta / (waveTime * static_cast<float>(SCALE)))) * waveSize)};
+                    if (index <= 32) mix += (BLAST_HUMP[index] * fadeFactor) / SCALE;
                 }
             }
             return std::min(mix << 7, static_cast<uint32_t>(32768));
@@ -244,8 +255,8 @@ FUNC(BlastFadeoutF, "Blast Fadeout",
             for (const auto& effect : effects) {
                 if (effect.type != thisEffect) continue;
                 auto timeDelta{Utility::getTimeMicros() - effect.startMicros};
-                auto M{1000 - (timeDelta / fadeTime)};
-                if (M > 0) mix += (32768 * M) / 1000;
+                auto fadeFactor{1000 - (timeDelta / fadeTime)};
+                if (fadeFactor > 0) mix += (32768 * fadeFactor) / 1000;
             }
             return std::min(mix, static_cast<uint32_t>(32768));
         }
@@ -274,16 +285,23 @@ FUNC(OriginalBlastF, "Original Blast",
         }
         GETINT(led) {
             if (effects.size() == 0) return 0;
-            float mix{0.f};
+            float mix{0.F};
             for (const auto& effect : effects) {
+                constexpr auto SCALE{30.F};
+                constexpr auto TIME_OFFSET{0.5F};
+                constexpr auto TIME_SCALE{200000.F};
+                constexpr auto INTENSITY_SCALE{2.F};
+
                 if (effect.type != thisEffect) continue;
-                float x{effect.location - (led / static_cast<float>(numLeds)) * 30.f};
+
+                float offset{effect.location - (led / static_cast<float>(numLeds)) * SCALE};
                 auto timeDelta{Utility::getTimeMicros() - effect.startMicros};
-                auto t{0.5 + (timeDelta / 200000.f)};
-                if (x == 0.f) mix += 2.f / (t * t);
-                else mix += std::max(0.f, 2.f * (sinf(x / (t * t)) / x));
+                auto timeFactor{TIME_OFFSET + (timeDelta / TIME_SCALE)};
+
+                if (offset == 0.F) mix += INTENSITY_SCALE / (timeFactor * timeFactor);
+                else mix += std::max(0.F, INTENSITY_SCALE * (sinf(offset / (timeFactor * timeFactor)) / offset));
             }
-            return std::min(mix, 1.f) * 32768;
+            return std::min(mix, 1.F) * (std::numeric_limits<int16_t>::max() + 1);
         }
         private:
             Effect thisEffect{Effect::NONE};
@@ -325,8 +343,8 @@ FUNC(BlinkingF, "Blinking",
             if (pulseMillis <= 0) return 0;
 
             auto pulseProgressMicros{now - pulseStartMicros};
-            if (pulseProgressMicros > pulseMillis * 1000) {
-                if (pulseProgressMicros < pulseMillis * 2000) pulseStartMicros += pulseMillis * 1000;
+            if (pulseProgressMicros > static_cast<uint64_t>(pulseMillis * 1000)) {
+                if (pulseProgressMicros < static_cast<uint64_t>(pulseMillis * 2000)) pulseStartMicros += pulseMillis * 1000;
                 else pulseStartMicros = now;
                 pulseProgressMicros = now - pulseStartMicros;
             }
@@ -352,11 +370,11 @@ FUNC(BrownNoiseF, "Brown Noise",
             grade = const_cast<FunctionStyle*>(static_cast<const FunctionStyle*>(getParamStyle(0)));
             grade->run(blade);
 
-            mix = rand() % 32768; // Not sure what random Fredrik uses... but this isn't inclusive
+            mix = ProffieUtils::random() % 32768; // Not sure what random Fredrik uses... but this isn't inclusive
         }
         GETINT(led) {
             auto gradeValue{grade->getInt(led)};
-            auto rawMixValue{static_cast<uint16_t>(mix + (rand() % ((gradeValue * 2) + 1)) - gradeValue)};
+            auto rawMixValue{static_cast<uint16_t>(mix + (ProffieUtils::random() % ((gradeValue * 2) + 1)) - gradeValue)};
             // Fredrik's clamps the negative but here I use a uint, so no need.
             mix = std::min<uint16_t>(32768, rawMixValue);
             return mix;
@@ -377,7 +395,7 @@ FUNC(SlowNoise, "Slow Noise",
             ),
         RUN(blade) {
             // This happens in the ctor in ProffieOS, hence the magic number and assignment
-            if (value == 0xFFFF) value = rand() % 32768;
+            if (value == 0xFFFF) value = ProffieUtils::random() % 32768;
 
             auto speed{const_cast<FunctionStyle*>(static_cast<const FunctionStyle*>(getParamStyle(0)))};
             speed->run(blade);
@@ -387,7 +405,7 @@ FUNC(SlowNoise, "Slow Noise",
             lastMillis = now;
             auto speedValue{speed->getInt(0)};
 
-            while (delta--) value = std::max<uint16_t>(value + ((rand() % ((speedValue * 2)  + 1)) - speedValue), 0);
+            while (delta--) value = std::max<uint16_t>(value + ((ProffieUtils::random() % ((speedValue * 2)  + 1)) - speedValue), 0);
         }
         GETINT() { return value; }
         private:
@@ -421,17 +439,18 @@ FUNC(Bump, "Bump",
                 return;
             }
 
-            multiplier = static_cast<uint16_t>(32 * 2.f * 128 * 32768 / widthValue / blade.numLeds);
+            constexpr auto MAX_VALUE{32 * 2.F * 128 * 32768};
+            multiplier = static_cast<uint16_t>(MAX_VALUE / widthValue / blade.numLeds);
             location = (pos->getInt(0) * blade.numLeds * multiplier) / 32768;
         }
         GETINT(led) {
             auto distance{static_cast<uint32_t>(abs((static_cast<int32_t>(led) * multiplier) - location))};
-            auto p{distance >> 7};
+            auto index{distance >> 7};
 
-            if (p >= (sizeof(bumpShape) / sizeof(bumpShape[0]) - 1)) return 0;
+            if (index >= (sizeof(BUMP_SHAPE) / sizeof(BUMP_SHAPE[0]) - 1)) return 0;
 
-            auto m{distance & 0x3F};
-            return (bumpShape[p] * (128 - m)) + (bumpShape[p + 1] * m);
+            auto modFactor{distance & 0x3F};
+            return (BUMP_SHAPE[index] * (128 - modFactor)) + (BUMP_SHAPE[index + 1] * modFactor);
         }
         private:
             FunctionStyle* pos;
@@ -439,13 +458,6 @@ FUNC(Bump, "Bump",
 
             int32_t location;
             int32_t multiplier;
-
-            static constexpr uint8_t bumpShape[33] = {
-                255, 255, 252, 247, 240, 232, 222, 211,
-                199, 186, 173, 159, 145, 132, 119, 106,
-                 94,  82,  72,  62,  53,  45,  38,  32,
-                 26,  22,  18,  14,  11,   9,   7,   5, 0
-            };
     )
 
 // Usage: HumpFlickerFX<FUNCTION>

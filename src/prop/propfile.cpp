@@ -22,9 +22,9 @@
 #include <fstream>
 #include <string>
 
+#include "config/settings.h"
 #include "log/logger.h"
 #include "pconf/pconf.h"
-#include "config/settings.h"
 
 PropFile::Data* readProp(const std::string& filename);
 
@@ -34,24 +34,24 @@ static PropFile::Data::ButtonMap* parsePropButtons(const PConf::Section& buttons
 
 static void checkSettingCommon(const PConf::Entry& entry, Config::Setting::DefineBase& setting);
 static void generateSettingCommon(Config::Setting::DefineBase& setting, const PConf::Section& section, const Config::Setting::DefineMap& settingMap);
-static Config::Setting::Toggle<Config::Setting::DefineBase>* generateToggle(const PConf::Section& toggleSection, const Config::Setting::DefineMap& settings);
-static std::vector<Config::Setting::Selection<Config::Setting::DefineBase>*> generateOptionSelections(const PConf::Section& optionSection, const Config::Setting::DefineMap& settings);
-static Config::Setting::Numeric<Config::Setting::DefineBase>* generateNumeric(const PConf::Section& numericSection, const Config::Setting::DefineMap& settings);
-static Config::Setting::Decimal<Config::Setting::DefineBase>* generateDecimal(const PConf::Section& decimalSection, const Config::Setting::DefineMap& settings);
+static Config::Setting::Toggle<Config::Setting::DefineBase>* generateToggle(const PConf::Section& toggleSection, const Config::Setting::DefineMap& settingMap);
+static std::vector<Config::Setting::Selection<Config::Setting::DefineBase>*> generateOptionSelections(const PConf::Section& optionSection, const Config::Setting::DefineMap& settingMap);
+static Config::Setting::Numeric<Config::Setting::DefineBase>* generateNumeric(const PConf::Section& numericSection, const Config::Setting::DefineMap& settingMap);
+static Config::Setting::Decimal<Config::Setting::DefineBase>* generateDecimal(const PConf::Section& decimalSection, const Config::Setting::DefineMap& settingMap);
 
 static std::vector<PropFile::Data::Button*> parseButtonState(const std::vector<PConf::Entry*>& buttonEntries, const Config::Setting::DefineMap* settings);
 
 PropFile::Data::~Data() {
     if (settings) {
-        for (auto& setting : *settings) if (setting.second) delete setting.second;
+        for (auto& setting : *settings)  delete setting.second;
         delete settings;
     }
     if (layout) {
-        for (auto& item : *layout) if (item) delete item;
+        for (auto& item : *layout)  delete item;
         delete layout;
     }
     for (auto& buttonMap : buttonControls) {
-        if (buttonMap.second) delete buttonMap.second;
+         delete buttonMap.second;
     }
 }
 
@@ -62,11 +62,12 @@ std::vector<PropFile::Data*> PropFile::getPropData(const std::vector<std::string
     for (const auto& file : pConfs) {
         if (propData.find(file) != propData.end()) continue;
 
-        auto prop{readProp(file)};
+        auto *prop{readProp(file)};
         if (!prop) continue;
 
         if (propNames.find(prop->name) != propNames.end()) {
             Logger::warn("Duplicate prop with name \"" + prop->name + "\" read, skipping!", false);
+            delete prop;
             continue;
         }
 
@@ -75,6 +76,7 @@ std::vector<PropFile::Data*> PropFile::getPropData(const std::vector<std::string
     }
 
     std::vector<PropFile::Data*> ret;
+    ret.reserve(propData.size());
     for (const auto& [ filename, prop ] : propData) {
         ret.push_back(prop);
     }
@@ -89,8 +91,8 @@ PropFile::Data* readProp(const std::string& filename) {
         return nullptr;
     }
 
-    auto prop{new PropFile::Data};
-    bool foundSect;
+    auto *prop{new PropFile::Data};
+    bool foundSect{false};
 
     while (propFile.peek() != EOF) {
         std::unique_ptr<PConf::Entry> entry{PConf::readEntry(propFile, foundSect)};
@@ -105,7 +107,7 @@ PropFile::Data* readProp(const std::string& filename) {
                 }
                 prop->layout = parsePropLayout(*sect, *prop->settings);
             } else if (sect->name == "BUTTONS") {
-                auto buttonMap{parsePropButtons(*sect, prop->settings)};
+                auto *buttonMap{parsePropButtons(*sect, prop->settings)};
                 if (buttonMap) prop->buttonControls.emplace(buttonMap->numButton, buttonMap);
             }
         }
@@ -119,7 +121,7 @@ PropFile::Data* readProp(const std::string& filename) {
 };
 
 static Config::Setting::DefineMap* parsePropSettings(const PConf::Section& settingsSection) {
-    auto settings{new Config::Setting::DefineMap};
+    auto *settings{new Config::Setting::DefineMap};
 
     for (const auto& entry : settingsSection.entries) {
         if (entry->getType() != PConf::DataType::SECTION) {
@@ -129,17 +131,17 @@ static Config::Setting::DefineMap* parsePropSettings(const PConf::Section& setti
 
 
         if (entry->name == "TOGGLE") {
-            auto toggle{generateToggle(*static_cast<PConf::Section*>(entry), *settings)};
+            auto *toggle{generateToggle(*static_cast<PConf::Section*>(entry), *settings)};
             if (toggle) settings->emplace(toggle->define, toggle);
         } else if (entry->name == "OPTION") {
             for (const auto& selection : generateOptionSelections(*static_cast<PConf::Section*>(entry), *settings)) {
                 settings->emplace(selection->define, selection);
             }
         } else if (entry->name == "NUMERIC") {
-            auto numeric{generateNumeric(*static_cast<PConf::Section*>(entry), *settings)};
+            auto *numeric{generateNumeric(*static_cast<PConf::Section*>(entry), *settings)};
             if (numeric) settings->emplace(numeric->define, numeric);
         } else if (entry->name == "DECIMAL") {
-            auto decimal{generateDecimal(*static_cast<PConf::Section*>(entry), *settings)};
+            auto *decimal{generateDecimal(*static_cast<PConf::Section*>(entry), *settings)};
             if (decimal) settings->emplace(decimal->define, decimal);
         }
     }
@@ -166,7 +168,7 @@ static Config::Setting::Toggle<Config::Setting::DefineBase>* generateToggle(cons
         return nullptr;
     }
 
-    auto toggle{new Config::Setting::Toggle<Config::Setting::DefineBase>};
+    auto *toggle{new Config::Setting::Toggle<Config::Setting::DefineBase>};
     generateSettingCommon(*toggle, toggleSection, settingMap);
     for (const auto& entry : toggleSection.entries) {
         checkSettingCommon(*entry, *toggle);
@@ -185,12 +187,12 @@ static std::vector<Config::Setting::Selection<Config::Setting::DefineBase>*> gen
                 continue;
             }
 
-            auto selection{new Config::Setting::Selection<Config::Setting::DefineBase>};
+            auto *selection{new Config::Setting::Selection<Config::Setting::DefineBase>};
             generateSettingCommon(*selection, *static_cast<PConf::Section*>(entry), settingMap);
-            for (const auto selectionEntry : static_cast<PConf::Section*>(entry)->entries) {
+            for (auto *const selectionEntry : static_cast<PConf::Section*>(entry)->entries) {
                 checkSettingCommon(*selectionEntry, *selection);
                 if (entry->name == "DISABLE") selection->disable = PConf::setFromValue(entry->value);
-                if (selectionEntry->name == "OUTPUT") selection->output = selectionEntry->value.value_or("TRUE") == "FALSE" ? false : true;
+                if (selectionEntry->name == "OUTPUT") selection->output = selectionEntry->value.value_or("TRUE") != "FALSE";
             }
 
             selections.push_back(selection);
@@ -221,9 +223,9 @@ static Config::Setting::Numeric<Config::Setting::DefineBase>* generateNumeric(co
         return nullptr;
     }
 
-    auto numeric{new Config::Setting::Numeric<Config::Setting::DefineBase>};
+    auto *numeric{new Config::Setting::Numeric<Config::Setting::DefineBase>};
     generateSettingCommon(*numeric, numericSection, settingMap);
-    for (const auto entry : numericSection.entries) {
+    for (auto *const entry : numericSection.entries) {
         checkSettingCommon(*entry, *numeric);
         const auto& val = entry->value.value_or(" ");
         if (entry->name == "MIN" && isNum(val)) numeric->min = stoi(val);
@@ -241,9 +243,9 @@ static Config::Setting::Decimal<Config::Setting::DefineBase>* generateDecimal(co
         return nullptr;
     }
 
-    auto decimal{new Config::Setting::Decimal<Config::Setting::DefineBase>};
+    auto *decimal{new Config::Setting::Decimal<Config::Setting::DefineBase>};
     generateSettingCommon(*decimal, decimalSection, settingMap);
-    for (const auto entry : decimalSection.entries) {
+    for (auto *const entry : decimalSection.entries) {
         checkSettingCommon(*entry, *decimal);
         const auto& val = entry->value.value_or(" ");
         if (entry->name == "MIN" && isNum(val)) decimal->min = stod(val);
@@ -256,9 +258,9 @@ static Config::Setting::Decimal<Config::Setting::DefineBase>* generateDecimal(co
 }
 
 static PropFile::Data::LayoutVec* parsePropLayout(const PConf::Section& layoutSection, const Config::Setting::DefineMap& settings) {
-    auto items{new PropFile::Data::LayoutVec};
+    auto *items{new PropFile::Data::LayoutVec};
 
-    for (const auto entry : layoutSection.entries) {
+    for (auto *const entry : layoutSection.entries) {
         if (entry->name == "SETTING") {
             if (!entry->label) {
                 Logger::warn("Layout entry missing label, skipping!", false);
@@ -269,7 +271,7 @@ static PropFile::Data::LayoutVec* parsePropLayout(const PConf::Section& layoutSe
                 Logger::warn("Layout entry has unknown setting, skipping! (" + entry->label.value() + ")", false);
                 continue;
             }
-            auto layoutItem{new PropFile::Data::LayoutItem};
+            auto *layoutItem{new PropFile::Data::LayoutItem};
             layoutItem->setting = setting->second;
             items->push_back(layoutItem);
         } else if (entry->name == "HORIZONTAL") {
@@ -277,7 +279,7 @@ static PropFile::Data::LayoutVec* parsePropLayout(const PConf::Section& layoutSe
                 Logger::warn("Horizontal layout section interpreted as entry due to syntax error, skipping!" + (entry->label ? " (" + entry->label.value() + ")" : ""), false);
                 continue;
             }
-            auto layoutLevel{new PropFile::Data::LayoutLevel};
+            auto *layoutLevel{new PropFile::Data::LayoutLevel};
             layoutLevel->direction = PropFile::Data::LayoutLevel::Direction::HORIZONTAL;
             layoutLevel->label = entry->label.value_or("");
             layoutLevel->items = parsePropLayout(*static_cast<PConf::Section*>(entry), settings);
@@ -287,7 +289,7 @@ static PropFile::Data::LayoutVec* parsePropLayout(const PConf::Section& layoutSe
                 Logger::warn("Vertical layout section interpreted as entry due to syntax error, skipping!" + (entry->label ? " (" + entry->label.value() + ")" : ""), false);
                 continue;
             }
-            auto layoutLevel{new PropFile::Data::LayoutLevel};
+            auto *layoutLevel{new PropFile::Data::LayoutLevel};
             layoutLevel->direction = PropFile::Data::LayoutLevel::Direction::VERTICAL;
             layoutLevel->label = entry->label.value_or("");
             layoutLevel->items = parsePropLayout(*static_cast<PConf::Section*>(entry), settings);
@@ -304,8 +306,8 @@ static PropFile::Data::ButtonMap* parsePropButtons(const PConf::Section& buttons
         return nullptr;
     }
 
-    auto buttonMap{new PropFile::Data::ButtonMap};
-    buttonMap->numButton = buttonsSection.labelNum.value();
+    auto *buttonMap{new PropFile::Data::ButtonMap};
+    buttonMap->numButton = static_cast<int8_t>(buttonsSection.labelNum.value());
 
     for (const auto& stateEntry : buttonsSection.entries) {
         if (stateEntry->name == "STATE") {
@@ -318,7 +320,7 @@ static PropFile::Data::ButtonMap* parsePropButtons(const PConf::Section& buttons
                 continue;
             }
 
-            auto state{new PropFile::Data::ButtonState};
+            auto *state{new PropFile::Data::ButtonState};
             state->label = stateEntry->label.value();
             state->buttons = parseButtonState(static_cast<PConf::Section*>(stateEntry)->entries, settings);
 
@@ -342,7 +344,7 @@ static std::vector<PropFile::Data::Button*> parseButtonState(const std::vector<P
             continue;
         }
 
-        auto button{new PropFile::Data::Button};
+        auto *button{new PropFile::Data::Button};
         button->label = buttonEntry->label.value();
 
         for (const auto& description : static_cast<PConf::Section*>(buttonEntry)->entries) {

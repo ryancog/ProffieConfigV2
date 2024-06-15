@@ -7,9 +7,7 @@
  * styles/elements/transitions.cpp
  *
  * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -30,7 +28,7 @@
 
 using namespace BladeStyles;
 
-static constexpr uint8_t blastHump[32]{
+static constexpr std::array<uint8_t, 32> BLAST_HUMP{
     255, 255, 252, 247, 240, 232, 222, 211,
     199, 186, 173, 159, 145, 132, 119, 106,
     94,   82,  72,  62,  53,  45,  38,  32,
@@ -45,9 +43,9 @@ TransitionStyle::TransitionStyle(
 
 class TransitionStyleImpl : public TransitionStyle {
 public:
-    ~TransitionStyleImpl() {
-        if (dynamic_cast<AddBend*>(millisFunc)) {
-            delete millisFunc;
+    ~TransitionStyleImpl() override {
+        if (dynamic_cast<AddBend*>(mMillisFunc)) {
+            delete mMillisFunc;
         }
     }
 
@@ -56,16 +54,16 @@ public:
      * This is done with templates and stuff in ProffieOS but this'll
      * do fine for ProffieConfig
      */
-    virtual void run(StylePreview::Blade&) override;
+    void run(StylePreview::Blade&) override;
 
-    virtual void begin() override;
-    virtual bool isDone() const override;
-    virtual bool shouldRestart() const override;
-    virtual uint32_t getStartMillis() const override;
+    void begin() override;
+    [[nodiscard]] bool isDone() const override;
+    [[nodiscard]] bool shouldRestart() const override;
+    [[nodiscard]] uint32_t getStartMillis() const override;
 
 protected:
-    TransitionStyleImpl(const char* osName, const char* humanName, const std::vector<Param*>& params, const size_t millisIndex) :
-        TransitionStyle(osName, humanName, params), millisIndex(millisIndex) {}
+    TransitionStyleImpl(const char* osName, const char* humanName, const std::vector<Param*>& params, const int32_t millisIndex) :
+        TransitionStyle(osName, humanName, params), mMillisIndex(millisIndex) {}
 
     /**
      * Used to do initial setup/calculations for each frame
@@ -82,17 +80,17 @@ protected:
     double update(double scale);
 
 private:
-    bool restart{false};
+    bool mRestart{false};
 
     // All transition functions have a time/millis
     // function, and they are needed in update(),
     // so I simply provide the index and the base class
     // handles the rest.
-    TimeFunctionStyle* millisFunc{nullptr};
-    const int32_t millisIndex;
+    TimeFunctionStyle* mMillisFunc{nullptr};
+    const int32_t mMillisIndex;
 
-    uint32_t startMillis{0};
-    uint32_t length{0};
+    uint32_t mStartMillis{0};
+    uint32_t mLength{0};
 };
 
 // Logic stays in the base, and we can (relatively) easily map the parameters
@@ -101,18 +99,18 @@ template<class T>
 class TransitionStyleWrap : public TransitionStyle {
 public:
     TransitionStyleWrap(const char* osName, const char* humanName, const std::vector<Param*>& params) :
-        TransitionStyle(osName, humanName, params), base() {}
+        TransitionStyle(osName, humanName, params), pBase() {}
 
-    virtual void begin() override { return base.begin(); }
-    virtual bool isDone() const override { return base.isDone();  }
-    virtual bool shouldRestart() const override { return base.shouldRestart(); }
-    virtual uint32_t getStartMillis() const override { return base.getStartMillis(); }
-    virtual ColorData getColor(const ColorData& colorA, const ColorData& colorB, int32_t led) override {
-        return base.getColor(colorA, colorB, led);
+    void begin() override { return pBase.begin(); }
+    [[nodiscard]] bool isDone() const override { return pBase.isDone();  }
+    [[nodiscard]] bool shouldRestart() const override { return pBase.shouldRestart(); }
+    [[nodiscard]] uint32_t getStartMillis() const override { return pBase.getStartMillis(); }
+    ColorData getColor(const ColorData& colorA, const ColorData& colorB, int32_t led) override {
+        return pBase.getColor(colorA, colorB, led);
     }
 
 protected:
-    T base;
+    T pBase;
 };
 
 
@@ -122,34 +120,38 @@ void TransitionStyleImpl::run(StylePreview::Blade& blade) {
     // for the object's life, and are also basically baked into the 
     // specific class.
 
-    if (millisIndex == -1) return doRun(blade);
+    if (mMillisIndex == -1) {
+        doRun(blade);
+        return;
+    }
+
     
-    auto timeParam{getParamStyle(millisIndex)};
+    const auto *timeParam{getParamStyle(mMillisIndex)};
 
     // This could change based on given parameter.
     if (timeParam->getType() & TIMEFUNC) {
-        if (dynamic_cast<AddBend*>(millisFunc)) delete millisFunc;
-        millisFunc = const_cast<TimeFunctionStyle*>(static_cast<const TimeFunctionStyle*>(timeParam));
+        if (dynamic_cast<AddBend*>(mMillisFunc)) delete mMillisFunc;
+        mMillisFunc = const_cast<TimeFunctionStyle*>(static_cast<const TimeFunctionStyle*>(timeParam));
     } else { // If type is FUNCTION
-        if (!dynamic_cast<AddBend*>(millisFunc)) millisFunc = new AddBend();
-        millisFunc->setParam(0, const_cast<BladeStyle*>(timeParam));
+        if (!dynamic_cast<AddBend*>(mMillisFunc)) mMillisFunc = new AddBend();
+        mMillisFunc->setParam(0, const_cast<BladeStyle*>(timeParam));
     }
 
-    millisFunc->run(blade);
-    if (restart) {
-        startMillis = Utility::getTimeMS();
-        length = millisFunc->getInt(0);
-        restart = false;
+    mMillisFunc->run(blade);
+    if (mRestart) {
+        mStartMillis = Utility::getTimeMS();
+        mLength = mMillisFunc->getInt(0);
+        mRestart = false;
     }
 
     doRun(blade);
 }
 double TransitionStyleImpl::update(double scale) {
     if (isDone()) return scale;
-    auto timeDelta{Utility::getTimeMS() - startMillis};
+    auto timeDelta{Utility::getTimeMS() - mStartMillis};
 
-    if (timeDelta > length) {
-        length = 0;
+    if (timeDelta > mLength) {
+        mLength = 0;
         return scale;
     }
 
@@ -158,16 +160,16 @@ double TransitionStyleImpl::update(double scale) {
     // that are in use. I've done my best to recreate that system in a
     // "cleaner" way... at least something that can be done at runtime
     // and maintain the structure somewhat.
-    return millisFunc->bend(timeDelta, length, scale);
+    return mMillisFunc->bend(timeDelta, mLength, scale);
 }
 
-void TransitionStyleImpl::begin() { restart = true; }
+void TransitionStyleImpl::begin() { mRestart = true; }
 
-bool TransitionStyleImpl::isDone() const { return length == 0; }
+bool TransitionStyleImpl::isDone() const { return mLength == 0; }
 
-bool TransitionStyleImpl::shouldRestart() const { return restart; }
+bool TransitionStyleImpl::shouldRestart() const { return mRestart; }
 
-uint32_t TransitionStyleImpl::getStartMillis() const { return startMillis; }
+uint32_t TransitionStyleImpl::getStartMillis() const { return mStartMillis; }
 
 StyleGenerator TransitionStyle::get(const std::string& styleName) {
     const auto& map{getMap()};
@@ -179,10 +181,10 @@ StyleGenerator TransitionStyle::get(const std::string& styleName) {
 const StyleMap& TransitionStyle::getMap() { return map; }
 
 #define RUN(varname) \
-    virtual void doRun(StylePreview::Blade& varname) override
+    void doRun(StylePreview::Blade& varname) override
 
 #define GETCOLOR(colorAvarname, colorBvarname, ledvarname) \
-    virtual ColorData getColor(const ColorData& colorAvarname, const ColorData& colorBvarname, const int32_t ledvarname) override
+    ColorData getColor(const ColorData& colorAvarname, const ColorData& colorBvarname, int32_t ledvarname) override
 
 #define TRANS(osName, humanName, millisIndex, params, ...) \
     class osName : public TransitionStyleImpl { \
@@ -321,7 +323,7 @@ TRANS(TrBlinkX, "Blink", 0,
             blink = (static_cast<int32_t>(update(32768 * getParamNumber(1))) & 0x7FFF) < distStyle->getInt(0);
         }
 
-        GETCOLOR(colorA, colorB, _) {
+        GETCOLOR(colorA, colorB,) {
             return blink ? colorA : colorB;
         }
 
@@ -336,16 +338,16 @@ TRANSW(TrBlink, "Blink", TrBlinkX,
             new NumberParam("Distribution", 16384)
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.setParam(1, getParamNumber(1));
+            pBase.setParam(1, getParamNumber(1));
 
             // this should be completely unnecessary, given Int is a default
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(2))->setParam(0, getParamNumber(2));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(2))->setParam(0, getParamNumber(2));
 
-            base.run(blade);
+            pBase.run(blade);
         }
      )
 
@@ -373,7 +375,7 @@ TRANS(TrBoingX, "Boing", 0,
                 fadeAmount &= 0x3FFF;
             }
         }
-        GETCOLOR(colorA, colorB, _) { return mixColors(colorA, colorB, fadeAmount, 14); }
+        GETCOLOR(colorA, colorB,) { return mixColors(colorA, colorB, fadeAmount, 14); }
 
         private:
             uint32_t fadeAmount;
@@ -385,12 +387,12 @@ TRANSW(TrBoing, "Boing", TrBoingX,
             new NumberParam("Number of Boings")
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.setParam(1, getParamNumber(1));
+            pBase.setParam(1, getParamNumber(1));
 
-            base.run(blade);
+            pBase.run(blade);
         }
      )
 
@@ -434,13 +436,13 @@ TRANSW(TrCenterWipe, "Center Wipe", TrCenterWipeX,
             new NumberParam("Center Position", 16384)
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            base.run(blade);
+            pBase.run(blade);
         }
         )
 
@@ -463,14 +465,14 @@ TRANSW(TrCenterWipeSparkX, "Center Wipe With Spark", TrJoin,
             new StyleParam("Center Position", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(16384)))
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, TransitionStyle::get("TrCenterWipeX")(PARAMVEC()));
-            auto centerWipeTransition{const_cast<TransitionStyle*>(static_cast<const TransitionStyle*>(base.getParamStyle(0)))};
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, TransitionStyle::get("TrCenterWipeX")(PARAMVEC()));
+            auto centerWipeTransition{const_cast<TransitionStyle*>(static_cast<const TransitionStyle*>(pBase.getParamStyle(0)))};
 
             centerWipeTransition->setParam(0, const_cast<BladeStyle*>(getParamStyle(1)));
             centerWipeTransition->setParam(1, const_cast<BladeStyle*>(getParamStyle(2)));
 
-            if (!base.getParamStyle(1)) base.setParam(1, TransitionStyle::get("TrWaveX")(PARAMVEC()));
-            auto waveTransition{const_cast<TransitionStyle*>(static_cast<const TransitionStyle*>(base.getParamStyle(1)))};
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, TransitionStyle::get("TrWaveX")(PARAMVEC()));
+            auto waveTransition{const_cast<TransitionStyle*>(static_cast<const TransitionStyle*>(pBase.getParamStyle(1)))};
 
             waveTransition->setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
 
@@ -485,7 +487,7 @@ TRANSW(TrCenterWipeSparkX, "Center Wipe With Spark", TrJoin,
 
             waveTransition->setParam(4, const_cast<BladeStyle*>(getParamStyle(2)));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -496,15 +498,15 @@ TRANSW(TrCenterWipeSpark, "Center Wipe With Spark", TrCenterWipeSparkX,
             new NumberParam("Center Position", 16384),
             ),
         RUNW(blade) {
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
 
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(2))->setParam(0, getParamNumber(2));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(2))->setParam(0, getParamNumber(2));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -548,13 +550,13 @@ TRANS(TrCenterWipeInX, "Center Wipe In", 0,
              new NumberParam("Center Position", 16384)
              ),
          RUNW(blade) {
-         if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-         const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+         if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+         const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-         if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
-         const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+         if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+         const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-         base.run(blade);
+         pBase.run(blade);
          }
        )
 
@@ -584,14 +586,14 @@ TRANSW(TrCenterWipeInSparkX, "Center Wipe In With Spark", TrJoin,
          new StyleParam("Center Position", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(16384)))
          ),
      RUNW(blade) {
-        if (!base.getParamStyle(0)) base.setParam(0, TransitionStyle::get("TrCenterWipeInX")(PARAMVEC()));
-        auto centerWipeTransition{STYLECAST(TransitionStyle, base.getParamStyle(0))};
+        if (!pBase.getParamStyle(0)) pBase.setParam(0, TransitionStyle::get("TrCenterWipeInX")(PARAMVEC()));
+        auto centerWipeTransition{STYLECAST(TransitionStyle, pBase.getParamStyle(0))};
         centerWipeTransition->setParam(0, const_cast<BladeStyle*>(getParamStyle(1)));
         centerWipeTransition->setParam(1, const_cast<BladeStyle*>(getParamStyle(2)));
 
         auto millisFunc{const_cast<BladeStyle*>(getParamStyle(1))};
-        if (!base.getParamStyle(1)) base.setParam(1, TransitionStyle::get("TrJoin")(PARAMVEC()));
-        auto joinTransition{STYLECAST(TransitionStyle, base.getParamStyle(1))};
+        if (!pBase.getParamStyle(1)) pBase.setParam(1, TransitionStyle::get("TrJoin")(PARAMVEC()));
+        auto joinTransition{STYLECAST(TransitionStyle, pBase.getParamStyle(1))};
 
         if (!joinTransition->getParamStyle(0)) joinTransition->setParam(0, TransitionStyle::get("TrWaveX")(PARAMVEC()));
         if (!joinTransition->getParamStyle(1)) joinTransition->setParam(1, TransitionStyle::get("TrWaveX")(PARAMVEC()));
@@ -617,7 +619,7 @@ TRANSW(TrCenterWipeInSparkX, "Center Wipe In With Spark", TrJoin,
         auto wave2Sum{STYLECAST(FunctionStyle, waveTr2->getParamStyle(3))};
         wave2Sum->setParams(PARAMVEC(millisFunc, millisFunc));
 
-        base.run(blade);
+        pBase.run(blade);
      }
    )
 
@@ -628,15 +630,15 @@ TRANSW(TrCenterWipeInSpark, "Center Wipe In With Spark", TrCenterWipeInSparkX,
             new NumberParam("Center Position", 16384)
             ),
         RUNW(blade) {
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
 
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(2))->setParam(0, getParamNumber(2));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(2))->setParam(0, getParamNumber(2));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -660,22 +662,23 @@ TRANS(TrColorCycleX, "Color Cycle", 0,
             lastMicros = now;
             if (delta > 1000000) delta = 1;
 
-            fade = update(1.f);
+            fade = update(1.F);
 
             float currentRpm{(getParamNumber(1) * (1 - fade)) + (getParamNumber(2) * fade)};
-            float currentPercentage{100.f * fade};
-            pos = ProffieUtils::fract(pos + ((delta / 60000000.0) * currentRpm));
+            float currentPercentage{100.F * fade};
+            constexpr auto TIME_SCALE{60000000.F};
+            pos = ProffieUtils::fract(pos + ((delta / TIME_SCALE) * currentRpm));
             numLeds = blade.numLeds * 16384;
             start = pos * numLeds;
 
-            if (currentPercentage == 100.f) {
+            if (currentPercentage == 100.F) {
                 start = 0;
                 end = numLeds;
-            } else if (currentPercentage == 0.f) {
+            } else if (currentPercentage == 0.F) {
                 start = 0;
                 end = 0;
             } else {
-                end = ProffieUtils::fract(pos + (currentPercentage / 100.f)) * numLeds;
+                end = ProffieUtils::fract(pos + (currentPercentage / 100.F)) * numLeds;
             }
         }
         GETCOLOR(colorA, colorB, led) {
@@ -708,13 +711,13 @@ TRANSW(TrColorCycle, "Color Cycle", TrColorCycleX,
             new NumberParam("End RPM", 6000),
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.setParam(1, getParamNumber(1));
-            base.setParam(2, getParamNumber(2));
+            pBase.setParam(1, getParamNumber(1));
+            pBase.setParam(2, getParamNumber(2));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -844,7 +847,7 @@ TRANS(TrDelayX, "Delay", 0,
             new StyleParam("Time (ms)", FUNCTION, nullptr),
             ),
         RUN() { update(0); }
-        GETCOLOR(colorA, colorB, _) {
+        GETCOLOR(colorA, colorB,) {
             return isDone() ? colorB : colorA;
         }
      )
@@ -854,10 +857,10 @@ TRANSW(TrDelay, "Delay", TrDelayX,
             new NumberParam("Time (ms)", 1000),
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
             
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -890,7 +893,7 @@ TRANS(TrDoEffectX, "Transition With Effect", -1,
             // location is a float here in ProffieOS, but there's no point
             // because it's just multiplied by 32768 and cast back to a uint16_t
             auto location{locationStyle->getInt(0)};
-            if (location == -1) location = rand() % 32768;
+            if (location == -1) location = ProffieUtils::random() % 32768;
 
             if (shouldBegin) {
                 if (blade.isOn()) {
@@ -932,14 +935,14 @@ TRANSW(TrDoEffect, "Transition With Effect", TrDoEffectX,
             new NumberParam("Location on Blade", -1),
             ),
         RUNW(blade) {
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
-            base.setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
+            pBase.setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
             const_cast<BladeStyle*>(getParamStyle(2))->setParam(0, getParamNumber(2));
-            if (!base.getParamStyle(3)) base.setParam(3, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(3)) pBase.setParam(3, FunctionStyle::get("Int")(PARAMVEC()));
             const_cast<BladeStyle*>(getParamStyle(3))->setParam(0, getParamNumber(3));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -960,7 +963,7 @@ TRANS(TrDoEffectAlwaysX, "Transition with Effect (Always)", -1,
             auto locationStyle{STYLECAST(FunctionStyle, getParamStyle(3))};
 
             auto location{locationStyle->getInt(0)};
-            if (location == -1) location = rand() % 32768;
+            if (location == -1) location = ProffieUtils::random() % 32768;
             if (shouldBegin) {
                 auto wavNum{audioNumStyle->getInt(0)};
                 auto effectStyle{STYLECAST(EffectStyle, getParamStyle(1))};
@@ -984,14 +987,14 @@ TRANSW(TrDoEffectAlways, "Transition With Effect (Always)", TrDoEffectAlwaysX,
             new NumberParam("Location on Blade", -1),
             ),
         RUNW(blade) {
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
-            base.setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
+            pBase.setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
             const_cast<BladeStyle*>(getParamStyle(2))->setParam(0, getParamNumber(2));
-            if (!base.getParamStyle(3)) base.setParam(3, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(3)) pBase.setParam(3, FunctionStyle::get("Int")(PARAMVEC()));
             const_cast<BladeStyle*>(getParamStyle(3))->setParam(0, getParamNumber(3));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1039,12 +1042,12 @@ TRANSW(TrExtend, "Freeze At End", TrExtendX,
             new StyleParam("Transition", TRANSITION, nullptr)
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
+            pBase.setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
 
-            base.run(blade);
+            pBase.run(blade);
             }
       )
 
@@ -1061,7 +1064,7 @@ TRANS(TrFadeX, "Fade", 0,
         RUN() {
             fade = update(16384);
         }
-        GETCOLOR(colorA, colorB, _) { return mixColors(colorA, colorB, fade, 14); }
+        GETCOLOR(colorA, colorB,) { return mixColors(colorA, colorB, fade, 14); }
 
         private:
             uint32_t fade;
@@ -1072,10 +1075,10 @@ TRANSW(TrFade, "Fade", TrFadeX,
             new NumberParam("Time (ms)", 1000),
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1092,10 +1095,10 @@ TRANS(TrSmoothFadeX, "Smooth Fade", 0,
             new StyleParam("Time (ms)", FUNCTION | TIMEFUNC, nullptr),
             ),
         RUN() {
-            auto x{static_cast<int32_t>(update(16384))};
-            fade = (((x * x) >> 14) * ((3 << 14) - x)) >> 16;
+            auto val{static_cast<int32_t>(update(16384))};
+            fade = (((val * val) >> 14) * ((3 << 14) - val)) >> 16;
         }
-        GETCOLOR(colorA, colorB, _) { return mixColors(colorA, colorB, fade, 14); }
+        GETCOLOR(colorA, colorB,) { return mixColors(colorA, colorB, fade, 14); }
 
         private:
             uint32_t fade;
@@ -1106,10 +1109,10 @@ TRANSW(TrSmoothFade, "Smooth Fade", TrSmoothFadeX,
             new NumberParam("Time (ms)", 1000),
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1119,7 +1122,7 @@ TRANSW(TrSmoothFade, "Smooth Fade", TrSmoothFadeX,
 TRANS(TrInstant, "Instant", -1,
         PARAMS(),
         RUN() {}
-        GETCOLOR(_, colorB,) { return colorB; }
+        GETCOLOR(, colorB,) { return colorB; }
         virtual bool isDone() const override { return true; }
         virtual void begin() override {}
         )
@@ -1184,12 +1187,12 @@ TRANSW(TrLoopN, "Loop", TrLoopNX,
             new StyleParam("Transition", TRANSITION, nullptr)
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(1)));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(1)));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1256,7 +1259,7 @@ TRANS(TrRandom, "Random", -1,
                 shouldBegin = false;
                 // Last variadic will be nullptr
                 auto numParams{getParams().size() - 1};
-                auto selectIndex{rand() % numParams};
+                auto selectIndex{ProffieUtils::random() % numParams};
                 selected = STYLECAST(TransitionStyle, getParamStyle(selectIndex));
                 selected->begin();
             }
@@ -1402,11 +1405,11 @@ TRANS(TrWaveX, "Wave", 1,
             auto waveTime{waveTimeStyle->getInt(0)};
             offset = ((Utility::getTimeMS() - getStartMillis()) * 32768) / /* prevent div by 0 */ (waveTime ? waveTime : 1);
         }
-        GETCOLOR(colorA, _, led) {
+        GETCOLOR(colorA,, led) {
             auto dist{std::abs(center - ((led * 32768) / numLeds))};
             auto index{(std::abs(dist - offset) * size) >> 15};
             auto mixTmp{0};
-            if (index < 32) mixTmp = (blastHump[index] * mix) >> 8;
+            if (index < 32) mixTmp = (BLAST_HUMP[index] * mix) >> 8;
             return mixColors(colorA, colorStyle->getColor(led), mixTmp, 15);
         }
 
@@ -1450,11 +1453,11 @@ TRANS(TrSparkX, "Spark", 2,
             numLeds = blade.numLeds;
             offset = update(32768);
         }
-        GETCOLOR(colorA, _, led) {
+        GETCOLOR(colorA,, led) {
             auto dist{std::abs(center - ((led * 32768) / numLeds))};
             auto index{(std::abs(dist - offset) * size) >> 15};
             auto mix{0};
-            if (index < 32) mix = blastHump[index] << 7;
+            if (index < 32) mix = BLAST_HUMP[index] << 7;
             return mixColors(colorA, colorStyle->getColor(led), mix, 15);
         }
 
@@ -1496,10 +1499,10 @@ TRANSW(TrWipe, "Wipe", TrWipeX,
             new NumberParam("Time (ms)", 1000)
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1533,10 +1536,10 @@ TRANSW(TrWipeIn, "Wipe In", TrWipeInX,
             new NumberParam("Time (ms)", 1000)
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1564,21 +1567,21 @@ TRANSW(TrWipeSparkTipX, "Wipe With Tip Spark", TrJoin,
             new StyleParam("Spark Size", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(400))),
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, TransitionStyle::get("TrWipeX")(PARAMVEC()));
-            if (!base.getParamStyle(1)) base.setParam(1, TransitionStyle::get("TrSparkX")(PARAMVEC()));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, TransitionStyle::get("TrWipeX")(PARAMVEC()));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, TransitionStyle::get("TrSparkX")(PARAMVEC()));
 
             auto timeStyle{const_cast<BladeStyle*>(getParamStyle(1))};
 
-            auto wipeStyle{STYLECAST(TransitionStyle, base.getParamStyle(0))};
+            auto wipeStyle{STYLECAST(TransitionStyle, pBase.getParamStyle(0))};
             wipeStyle->setParam(0, timeStyle);
 
-            auto sparkStyle{STYLECAST(TransitionStyle, base.getParamStyle(1))};
+            auto sparkStyle{STYLECAST(TransitionStyle, pBase.getParamStyle(1))};
             if (!sparkStyle->getParamStyle(3)) sparkStyle->setParam(3, FunctionStyle::get("Int")(PARAMVEC(0)));
             sparkStyle->setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
             sparkStyle->setParam(1, const_cast<BladeStyle*>(getParamStyle(2)));
             sparkStyle->setParam(2, timeStyle);
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1589,15 +1592,15 @@ TRANSW(TrWipeSparkTip, "Wipe With Tip Spark", TrWipeSparkTipX,
             new NumberParam("Spark Size", 400)
             ),
         RUNW(blade) {
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
 
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(2))->setParam(0, getParamNumber(2));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(2))->setParam(0, getParamNumber(2));
 
-            base.run(blade);
+            pBase.run(blade);
         }
       )
 
@@ -1623,21 +1626,21 @@ TRANSW(TrWipeInSparkTipX, "Wipe In With Tip Spark", TrJoin,
             new StyleParam("Spark Size", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(400))),
             ),
         RUNW(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, TransitionStyle::get("TrWipeX")(PARAMVEC()));
-            if (!base.getParamStyle(1)) base.setParam(1, TransitionStyle::get("TrSparkX")(PARAMVEC()));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, TransitionStyle::get("TrWipeX")(PARAMVEC()));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, TransitionStyle::get("TrSparkX")(PARAMVEC()));
 
             auto timeStyle{const_cast<BladeStyle*>(getParamStyle(1))};
 
-            auto wipeStyle{STYLECAST(TransitionStyle, base.getParamStyle(0))};
+            auto wipeStyle{STYLECAST(TransitionStyle, pBase.getParamStyle(0))};
             wipeStyle->setParam(0, timeStyle);
 
-            auto sparkStyle{STYLECAST(TransitionStyle, base.getParamStyle(1))};
+            auto sparkStyle{STYLECAST(TransitionStyle, pBase.getParamStyle(1))};
             if (!sparkStyle->getParamStyle(3)) sparkStyle->setParam(3, FunctionStyle::get("Int")(PARAMVEC(32768)));
             sparkStyle->setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
             sparkStyle->setParam(1, const_cast<BladeStyle*>(getParamStyle(2)));
             sparkStyle->setParam(2, timeStyle);
 
-            base.run(blade);
+            pBase.run(blade);
         }
     )
 
@@ -1648,15 +1651,15 @@ TRANSW(TrWipeInSparkTip, "Wipe In With Tip Spark", TrWipeInSparkTipX,
             new NumberParam("Spark Size", 400)
             ),
         RUNW(blade) {
-            base.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
+            pBase.setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
 
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            if (!base.getParamStyle(2)) base.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
-            const_cast<BladeStyle*>(base.getParamStyle(2))->setParam(0, getParamNumber(2));
+            if (!pBase.getParamStyle(2)) pBase.setParam(2, FunctionStyle::get("Int")(PARAMVEC()));
+            const_cast<BladeStyle*>(pBase.getParamStyle(2))->setParam(0, getParamNumber(2));
 
-            base.run(blade);
+            pBase.run(blade);
         }
     )
 

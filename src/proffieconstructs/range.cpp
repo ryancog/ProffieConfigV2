@@ -2,7 +2,7 @@
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek,
- * based on code from ProffieOS, copyright Fredrik Hubinette et al.
+ * partially based on code from ProffieOS, copyright Fredrik Hubinette et al.
  *
  * proffieconstructs/range.cpp
  *
@@ -22,7 +22,6 @@
 
 #include <algorithm>
 
-Range::Range() {}
 Range::Range(uint32_t start, uint32_t end) : start(start), end(end) {}
 
 uint32_t Range::size() const {
@@ -31,9 +30,9 @@ uint32_t Range::size() const {
 }
 
 Range Range::operator&(const Range& other) const {
-    return Range(
+    return {
             std::max(start, other.start),
             std::min(end, other.end)
-            );
+            };
 }
 

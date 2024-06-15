@@ -186,14 +186,14 @@ static void readTop(std::istream& stream, Config::Data& config) {
         }
         if (buf.find("#define") == std::string::npos) continue;
 
-        constexpr auto delims{" \t"};
+        constexpr auto DELIMS{" \t"};
 
-        constexpr const char* defineStr{"#define"};
-        auto definePos{buf.find_first_not_of(delims, buf.find(defineStr) + strlen(defineStr))};
-        auto defineEnd{buf.find_first_of(delims, definePos)};
+        constexpr const char* DEFINE_STR{"#define"};
+        auto definePos{buf.find_first_not_of(DELIMS, buf.find(DEFINE_STR) + strlen(DEFINE_STR))};
+        auto defineEnd{buf.find_first_of(DELIMS, definePos)};
 
-        auto valuePos{buf.find_first_not_of(delims, defineEnd)};
-        auto valueEnd{buf.find_last_not_of(delims) + 1};
+        auto valuePos{buf.find_first_not_of(DELIMS, defineEnd)};
+        auto valueEnd{buf.find_last_not_of(DELIMS) + 1};
 
         auto defineName{buf.substr(definePos, defineEnd - definePos)};
         std::optional<DefineMap::const_iterator> define;
@@ -249,8 +249,8 @@ static void readProp(std::istream& stream, Config::Data& config) {
 
         if (buf.find("#include") == std::string::npos) continue;
 
-        constexpr const char* propsPathStr{R"("../props/)"};
-        auto propStart{buf.find(propsPathStr)};
+        constexpr const char* PROPPATH_STR{R"("../props/)"};
+        auto propStart{buf.find(PROPPATH_STR)};
         auto propEnd{buf.rfind('\"')};
 
         if (propStart == std::string::npos || propStart == propEnd) {
@@ -258,7 +258,7 @@ static void readProp(std::istream& stream, Config::Data& config) {
             continue;
         }
 
-        config.selectedProp.value = buf.substr(propStart + strlen(propsPathStr), propEnd - propStart - strlen(propsPathStr));
+        config.selectedProp.value = buf.substr(propStart + strlen(PROPPATH_STR), propEnd - propStart - strlen(PROPPATH_STR));
         return;
     }
 }

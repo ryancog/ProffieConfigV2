@@ -21,8 +21,8 @@
  */
 
 #include "styles/bladestyle.h"
-#include "styles/elements/functions.h"
 #include "stylepreview/blade.h"
+#include "styles/elements/functions.h"
 
 namespace BladeStyles {
 
@@ -54,15 +54,15 @@ public:
               "SCARY",
               PARAMS(new StyleParam("MILLIS", FUNCTION, nullptr))) {}
 
-  virtual void run(StylePreview::Blade& blade) override {
+  void run(StylePreview::Blade& blade) override {
       millisStyle = const_cast<FunctionStyle*>(static_cast<const FunctionStyle*>(getParamStyle(0)));
       millisStyle->run(blade);
   }
-  virtual double bend(uint32_t time, uint32_t length, double scale) override {
-    return (scale * time) / length;
+  double bend(uint32_t time, uint32_t length, double scale) override {
+      return (scale * time) / length;
   }
-  virtual int32_t getInt(int32_t led) override {
-    return millisStyle->getInt(led);
+  int32_t getInt(int32_t led) override {
+      return millisStyle->getInt(led);
   }
 
 private:
@@ -71,4 +71,4 @@ private:
 
 
 
-}
+} // namespace BladeStyles

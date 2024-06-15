@@ -20,19 +20,21 @@
  */
 
 #include <iostream>
-#include <unordered_map>
 #include <ostream>
+#include <unordered_map>
 
-static std::unordered_map<std::ostream*, Logger::LogLevel>* logOutputs;
+namespace Logger {
 
-void Logger::init() {
-    if (!logOutputs) logOutputs = new std::unordered_map<std::ostream*, Logger::LogLevel>{ {&std::cout, Logger::LogLevel::ALL} };
+std::unordered_map<std::ostream*, LogLevel>* logOutputs;
+
+void init() {
+    if (!logOutputs) logOutputs = new std::unordered_map<std::ostream*, LogLevel>{ {&std::cout, LogLevel::ALL} };
 }
 
-void Logger::log(LogLevel level, const std::string& message, const bool) {
+void log(LogLevel level, const std::string& message, const bool) {
     std::string prefix;
     switch (level) {
-    case ERROR:
+    case ERR:
         prefix += "\e[31m (ERR) ";
         break;
     case WARN:
@@ -48,38 +50,42 @@ void Logger::log(LogLevel level, const std::string& message, const bool) {
         prefix += "\e[37m(VERB) ";
         break;
     default:
-        std::cerr << "Invalid Log Level" << std::endl;
+        std::cerr << "Invalid Log Level\n";
         return;
     }
 
     for (auto logOut : *logOutputs) {
         if (!(level & logOut.second)) continue;
-        (*logOut.first) << prefix << message << "\e[0m" << std::endl;
+        (*logOut.first) << prefix << message << "\e[0m\n";
+        (*logOut.first).flush();
     }
 }
 
-void Logger::addLogOut(std::ostream& out, LogLevel level) {
+void addLogOut(std::ostream& out, LogLevel level) {
     logOutputs->insert({ &out, level});
 }
 
-void Logger::removeLogOut(std::ostream& out) {
+void removeLogOut(std::ostream& out) {
     auto toRemove{logOutputs->find(&out)};
     if (toRemove != logOutputs->end()) logOutputs->erase(toRemove);
 }
 
 
-void Logger::error(const std::string& message, const bool notify) {
-    log(ERROR, message, notify);
+void error(const std::string& message, bool notify) {
+    log(ERR, message, notify);
 }
-void Logger::warn (const std::string& message, const bool notify) {
+void warn (const std::string& message, bool notify) {
     log(WARN, message, notify);
 }
-void Logger::info (const std::string& message, const bool notify) {
+void info (const std::string& message, bool notify) {
     log(INFO, message, notify);
 }
-void Logger::debug(const std::string& message, const bool notify) {
+void debug(const std::string& message, bool notify) {
     log(DEBUG, message, notify);
 }
-void Logger::verbose(const std::string& message, const bool notify) {
+void verbose(const std::string& message, bool notify) {
     log(VERBOSE, message, notify);
 }
+
+} // namespace Logger
+

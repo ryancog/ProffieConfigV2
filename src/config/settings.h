@@ -21,6 +21,7 @@
 
 #include <map>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -34,11 +35,6 @@ namespace Config::Setting {
 
 struct DefineBase;
 struct SettingBase;
-template<class> struct Toggle;
-template<class> struct Selection;
-template<class> struct Numeric;
-template<class> struct Decimal;
-template<class> struct Combo;
 
 using DefineMap = std::map<std::string, DefineBase *>;
 using SettingMap = std::unordered_map<std::string, SettingBase *>;
@@ -50,6 +46,17 @@ enum class SettingType {
     DECIMAL,
     COMBO
 };
+
+template<class BASE>
+concept Base = (std::is_same_v<BASE, SettingBase> || std::derived_from<BASE, SettingBase>) && requires (BASE base) {
+    { base.getType() } -> std::same_as<SettingType>;
+};
+
+template<Base> struct Toggle;
+template<Base> struct Selection;
+template<Base> struct Numeric;
+template<Base> struct Decimal;
+template<Base> struct Combo;
 
 struct SettingBase {
     SettingBase() = default;
@@ -79,17 +86,17 @@ struct DefineBase : SettingBase {
 };
 
 
-template<class BASE>
+template<Base BASE>
 struct Toggle : BASE {
     std::unordered_set<std::string> disable;
     bool value{false};
 
     PCUI::Toggle* control{nullptr};
 
-    virtual SettingType getType() const { return SettingType::TOGGLE; }
+    [[nodiscard]] virtual SettingType getType() const { return SettingType::TOGGLE; }
 };
 
-template<class BASE> 
+template<Base BASE> 
 struct Selection : Toggle<BASE> {
     bool output{true};
     std::unordered_set<Selection*> peers;
@@ -99,42 +106,39 @@ struct Selection : Toggle<BASE> {
     [[nodiscard]] virtual SettingType getType() const { return SettingType::SELECTION; }
 };
 
-template<class BASE>
+template<Base BASE>
 struct Numeric : BASE {
     int32_t min{0};
-    int32_t max{100};
+    int32_t max{100}; // NOLINT(readability-magic-numbers)
     int32_t value{min};
     int32_t increment{1};
 
     PCUI::Numeric* control{nullptr};
 
-    virtual SettingType getType() const { return SettingType::NUMERIC; }
-    virtual ~Numeric() {}
+    [[nodiscard]] virtual SettingType getType() const { return SettingType::NUMERIC; }
 };
 
-template<class Base>
-struct Decimal : Base {
+template<Base BASE>
+struct Decimal : BASE {
     double min{0};
     double max{0};
     double value{min};
-    double increment{0.1};
+    double increment{0.1}; // NOLINT(readability-magic-numbers)
 
     PCUI::NumericDec* control{nullptr};
 
-    virtual SettingType getType() const { return SettingType::DECIMAL; }
-    virtual ~Decimal() {}
+    [[nodiscard]] virtual SettingType getType() const { return SettingType::DECIMAL; }
 };
 
-template<class Base>
-struct Combo : Base {
-    typedef std::unordered_map<std::string, std::string> OptionMap;
+template<Base BASE>
+struct Combo : BASE {
+    using OptionMap = std::unordered_map<std::string, std::string>;
     OptionMap options;
     std::string value;
 
     PCUI::ComboBox* control{nullptr};
 
-    virtual SettingType getType() const { return SettingType::COMBO; }
-    virtual ~Combo() {}
+    [[nodiscard]] virtual SettingType getType() const { return SettingType::COMBO; }
 };
 
-}
+} // namespace Config::Setting

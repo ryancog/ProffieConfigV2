@@ -20,17 +20,14 @@
  */
 
 
-const std::vector<BladeStyles::StylePreview::BladeEffect> &BladeStyles::StylePreview::Blade::getEffects() const
-{
+const std::vector<BladeStyles::StylePreview::BladeEffect> &BladeStyles::StylePreview::Blade::getEffects() const {
 
 }
 
-bool BladeStyles::StylePreview::Blade::isOn() const
-{
+bool BladeStyles::StylePreview::Blade::isOn() const {
 
 }
 
-void BladeStyles::StylePreview::Blade::doEffect(Effect, int32_t location, int32_t wavNum)
-{
+void BladeStyles::StylePreview::Blade::doEffect(Effect, int32_t location, int32_t wavNum) {
 
 }

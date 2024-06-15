@@ -27,4 +27,4 @@ class Drawer : wxPanel {
 
 };
 
-}
+} // namespace PCUI

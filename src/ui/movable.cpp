@@ -19,8 +19,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
-
 #include <wx/event.h>
 #include <wx/gdicmn.h>
 #include <wx/scrolwin.h>
@@ -35,42 +33,43 @@ wxDEFINE_EVENT(PCUI::MV_END, wxMouseEvent);
 
 MoveArea::MoveArea(
     wxWindow* parent,
-    int32_t id,
+    wxWindowID winID,
     const wxPoint& pos,
     const wxSize& size,
-    int32_t style) :
-    wxPanel(parent, id, pos, size, style, "MoveArea") {
+    int64_t style) :
+    wxPanel(parent, winID, pos, size, style, "MoveArea") {
     Bind(wxEVT_LEFT_UP, [&](wxMouseEvent& evt) {
         if (HasCapture()) ReleaseMouse();
-        if (dragWindow) {
+        if (mDragWindow) {
             auto newEvt{wxMouseEvent(evt)};
             newEvt.SetEventType(MV_END);
             wxPostEvent(this, newEvt);
             auto evtPos{ClientToScreen(evt.GetPosition())};
 
-            for (auto childIt{childStack.crbegin()}; childIt != childStack.crend(); childIt++) {
-                if (*childIt == dragWindow) continue;
-                if (!(*childIt)->routine(dragWindow, evtPos)) continue;
+            for (auto childIt{mChildStack.crbegin()}; childIt != mChildStack.crend(); childIt++) {
+                if (*childIt == mDragWindow) continue;
+                if (!(*childIt)->pRoutine) continue;
+                if (!(*childIt)->pRoutine(mDragWindow, evtPos)) continue;
 
-                addChildToStack(dragWindow);
-                dragWindow = nullptr;
+                addChildToStack(mDragWindow);
+                mDragWindow = nullptr;
                 return;
             }
-            for (const auto& [ window, routine ] : adoptionRoutines) {
-                if (window == dragWindow) continue;
-                if (routine(dragWindow, evtPos)) {
-                    addChildToStack(dragWindow);
-                    dragWindow = nullptr;
+            for (const auto& [ window, routine ] : mAdoptionRoutines) {
+                if (window == mDragWindow) continue;
+                if (routine(mDragWindow, evtPos)) {
+                    addChildToStack(mDragWindow);
+                    mDragWindow = nullptr;
                     return;
                 }
             }
-            dragWindow->Destroy();
-            dragWindow = nullptr;
+            mDragWindow->Destroy();
+            mDragWindow = nullptr;
         }
     });
     Bind(MOVECLICK_FALLTHROUGH, [&](wxMouseEvent& evt) {
         bool testing{false};
-        for (auto childIt{childStack.crbegin()}; childIt != childStack.crend(); childIt++) {
+        for (auto childIt{mChildStack.crbegin()}; childIt != mChildStack.crend(); childIt++) {
             if (!testing) {
                 testing = (evt.GetEventObject() == *childIt);
                 continue;
@@ -85,81 +84,78 @@ MoveArea::MoveArea(
         }
     });
     Bind(wxEVT_MOTION, [&](wxMouseEvent& event) {
+        if (!mDragWindow) return;
+
         auto pos{event.GetPosition()};
-        if (dragWindow) dragWindow->Move(dragWindow->GetPosition() - calcDelta(&pos));
+        mDragWindow->Move(mDragWindow->GetPosition() - calcDelta(&pos));
     });
 }
 
-void MoveArea::addAdoptRoutine(wxWindow* window, AdoptionRoutine routine) { adoptionRoutines.emplace(window, routine); };
+void MoveArea::addAdoptRoutine(wxWindow* window, AdoptionRoutine routine) { mAdoptionRoutines.emplace(window, routine); };
 
 void MoveArea::removeAdoptRoutine(wxWindow* window) { 
-    auto routine{adoptionRoutines.find(window)};
-    if (routine == adoptionRoutines.end()) return;
-    adoptionRoutines.erase(routine);
+    auto routine{mAdoptionRoutines.find(window)};
+    if (routine == mAdoptionRoutines.end()) return;
+    mAdoptionRoutines.erase(routine);
 };
 
 void MoveArea::addChildToStack(Movable* child) {
-    childStack.push_back(child);
-    for (const auto grandChild : child->GetChildren()) {
-        auto grandMoveChild{dynamic_cast<Movable*>(grandChild)};
+    mChildStack.push_back(child);
+    for (auto *const grandChild : child->GetChildren()) {
+        auto *grandMoveChild{dynamic_cast<Movable*>(grandChild)};
         if (grandMoveChild) addChildToStack(grandMoveChild);
     }
 }
 
 void MoveArea::removeChildFromStack(Movable* child) {
-    for (const auto grandChild : child->GetChildren()) {
-        auto grandMoveChild{dynamic_cast<Movable*>(grandChild)};
+    for (auto *const grandChild : child->GetChildren()) {
+        auto *grandMoveChild{dynamic_cast<Movable*>(grandChild)};
         if (grandMoveChild) removeChildFromStack(grandMoveChild);
     }
-    for (auto childIt{childStack.cbegin()}; childIt != childStack.cend(); childIt++) {
+    for (auto childIt{mChildStack.cbegin()}; childIt != mChildStack.cend(); childIt++) {
         if (*childIt == child) {
-            childStack.erase(childIt); 
+            mChildStack.erase(childIt); 
             return;
         }
     }
 }
 
 wxPoint MoveArea::calcDelta(const wxPoint* mousePos) {
-    static wxPoint lastPos;
-    static bool reset{false};
-
     if (!mousePos) {
-        reset = true;
+        mCalcData.reset = true;
         return {};
     }
-    if (reset) {
-        reset = false;
-        lastPos = *mousePos;
+    if (mCalcData.reset) {
+        mCalcData.reset = false;
+        mCalcData.lastPos = *mousePos;
     }
 
-    auto ret{lastPos - *mousePos};
-    lastPos = *mousePos;
+    auto ret{mCalcData.lastPos - *mousePos};
+    mCalcData.lastPos = *mousePos;
     return ret;
 }
 
 MovePanel::MovePanel(
         wxWindow* parent,
         MoveArea* moveArea,
-        int32_t id,
+        wxWindowID winID,
         const wxPoint& pos,
         const wxSize& size,
-        int32_t style,
+        int64_t style,
         const wxString& objName) {
-    create(parent, moveArea, id, pos, size, style, objName);
+    create(parent, moveArea, winID, pos, size, style, objName);
 }
-
-MovePanel::MovePanel() {}
 
 void MovePanel::create(
         wxWindow* parent,
         MoveArea* moveArea,
-        int32_t id,
+        wxWindowID winID,
         const wxPoint& pos,
         const wxSize& size,
-        int32_t style,
+        int64_t style,
         const wxString& objName) {
-    Create(parent, id, pos, size, style, objName);
-    this->moveArea = moveArea;
+    Create(parent, winID, pos, size, style, objName);
+    this->pMoveArea = moveArea;
     moveArea->addAdoptRoutine(this, [this](Movable* toAdopt, wxPoint mousePos) -> bool {
         if (!hitTest(ScreenToClient(mousePos))) return false;
 
@@ -171,93 +167,92 @@ void MovePanel::create(
 }
 
 MovePanel::~MovePanel() {
-    moveArea->removeAdoptRoutine(this);
+    pMoveArea->removeAdoptRoutine(this);
 }
 
 bool MovePanel::hitTest(wxPoint pos) const {
     if (pos.x < 0 || pos.y < 0) return false;
-    auto size{GetSize()};
-    if (pos.x > size.x || pos.y > size.y) return false;
 
-    return true;
+    auto size{GetSize()};
+    return pos.x <= size.x && pos.y <= size.y;
 }
 
 ScrolledMovePanel::ScrolledMovePanel(
         wxWindow* parent,
         MoveArea* moveArea,
-        int32_t id,
+        wxWindowID winID,
         const wxPoint& pos,
         const wxSize& size,
-        int32_t style,
-        int32_t scrollStyle,
+        int64_t style,
+        int64_t scrollStyle,
         const wxString& objName) {
-    canvas = new wxScrolledCanvas(parent, id, pos, size, scrollStyle, "Scrolled Canvas (Move Panel)");
-    canvas->SetScrollRate(1, 1);
-    auto sizer{new wxBoxSizer(wxVERTICAL)};
-    create(canvas, moveArea, id, wxDefaultPosition, wxDefaultSize, style, objName);
+    pCanvas = new wxScrolledCanvas(parent, winID, pos, size, scrollStyle, "Scrolled Canvas (Move Panel)");
+    pCanvas->SetScrollRate(1, 1);
+    auto *sizer{new wxBoxSizer(wxVERTICAL)};
+    create(pCanvas, moveArea, winID, wxDefaultPosition, wxDefaultSize, style, objName);
     sizer->Add(this, wxSizerFlags(1).Expand());
-    canvas->SetSizerAndFit(sizer);
+    pCanvas->SetSizerAndFit(sizer);
 
     moveArea->Bind(PCUI::MV_START, [this](wxMouseEvent& evt) {
         evt.Skip();
-        if (!timer) timer = new wxTimer(this, TIMER_DRAG);
-        restoreRoutine(this->moveArea->getDragWindow());
-        timer->Start(20);
+        if (!pTimer) pTimer = new wxTimer(this, TIMER_DRAG);
+        restoreRoutine(this->pMoveArea->getDragWindow());
+        constexpr auto UPDATE_INTERVAL{20};
+        pTimer->Start(UPDATE_INTERVAL);
     });
     moveArea->Bind(PCUI::MV_END, [this](wxMouseEvent& evt) {
         evt.Skip();
         shrinkToFit();
     });
-    canvas->Bind(wxEVT_SCROLLWIN_THUMBRELEASE, [this](wxScrollWinEvent& evt) {
+    pCanvas->Bind(wxEVT_SCROLLWIN_THUMBRELEASE, [this](wxScrollWinEvent& evt) {
         evt.Skip();
         shrinkToFit();
     });
-    canvas->Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& evt) {
-        if (evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) scroll({evt.GetWheelRotation() < 0 ? jogDistance : -jogDistance, 0});
-        else scroll({0, evt.GetWheelRotation() < 0 ? jogDistance : -jogDistance});
+    pCanvas->Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& evt) {
+        if (evt.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) scroll({evt.GetWheelRotation() < 0 ? pJogDistance : -pJogDistance, 0});
+        else scroll({0, evt.GetWheelRotation() < 0 ? pJogDistance : -pJogDistance});
         shrinkToFit();
     });
     Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& evt) {
         if (!HasCapture()) CaptureMouse();
-        lastDragPos = ClientToScreen(evt.GetPosition());
-        dragging = true;
+        pLastDragPos = ClientToScreen(evt.GetPosition());
+        pDragging = true;
     });
     Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) {
         if (HasCapture()) ReleaseMouse();
         shrinkToFit();
-        dragging = false;
+        pDragging = false;
     });
     Bind(wxEVT_MOTION, [this](wxMouseEvent& evt) {
-        if (!dragging) return;
+        if (!pDragging) return;
 
         auto evtPos{ClientToScreen(evt.GetPosition())};
-        wxSize scrollDelta{lastDragPos.x - evtPos.x, lastDragPos.y - evtPos.y};
+        wxSize scrollDelta{pLastDragPos.x - evtPos.x, pLastDragPos.y - evtPos.y};
         scroll(scrollDelta);
-        lastDragPos = evtPos;
+        pLastDragPos = evtPos;
     });
     Bind(wxEVT_TIMER, &ScrolledMovePanel::dragTick, this, TIMER_DRAG);
 }
 
 ScrolledMovePanel::~ScrolledMovePanel() {
-    if (canvas && !canvas->GetParent()) canvas->Destroy();
+    if (pCanvas && !pCanvas->GetParent()) pCanvas->Destroy();
 }
 
-wxScrolledCanvas* ScrolledMovePanel::getCanvas() { return canvas; }
+wxScrolledCanvas* ScrolledMovePanel::getCanvas() { return pCanvas; }
 bool ScrolledMovePanel::hitTest(wxPoint pos) const {
     if (pos.x < 0 || pos.y < 0) return false;
-    auto size{GetSize()};
-    if (pos.x > size.x || pos.y > size.y) return false;
 
-    return true;
+    auto size{GetSize()};
+    return pos.x <= size.x && pos.y <= size.y;
 }
 
 void ScrolledMovePanel::checkSuppressRoutines() {
-    for (const auto child : GetChildren()) {
-        auto moveChild{dynamic_cast<Movable*>(child)};
+    for (auto *const child : GetChildren()) {
+        auto *moveChild{dynamic_cast<Movable*>(child)};
         if (!moveChild) continue;
 
-        auto viewStart{canvas->GetScreenPosition()};
-        auto viewEnd{viewStart + canvas->GetSize()};
+        auto viewStart{pCanvas->GetScreenPosition()};
+        auto viewEnd{viewStart + pCanvas->GetSize()};
         auto childStart{moveChild->GetScreenPosition()};
         auto childEnd{childStart + moveChild->GetSize()};
         if (childEnd.x < viewStart.x || 
@@ -275,11 +270,11 @@ void ScrolledMovePanel::checkSuppressRoutines() {
         if (childEnd.y > viewEnd.y) { clipSuppress = true; childEnd.y = viewEnd.y; }
 
         wxRegion clippedRegion{childStart, childEnd};
-        if (clipSuppress) suppressRoutine(moveChild, [=](Movable* toAdopt, wxPoint pos) -> bool {
+        if (clipSuppress) suppressRoutine(moveChild, [this, clippedRegion, moveChild](Movable* toAdopt, wxPoint pos) -> bool {
             if (!clippedRegion.Contains(pos)) return false;
 
-            auto suppressedRoutineIt{suppressedRoutines.find(moveChild)};
-            if (suppressedRoutineIt == suppressedRoutines.end()) return false;
+            auto suppressedRoutineIt{pSuppressedRoutines.find(moveChild)};
+            if (suppressedRoutineIt == pSuppressedRoutines.end()) return false;
             if (!suppressedRoutineIt->second) return false;
 
             return suppressedRoutineIt->second(toAdopt, pos);
@@ -289,37 +284,37 @@ void ScrolledMovePanel::checkSuppressRoutines() {
 }
 
 void ScrolledMovePanel::suppressRoutine(Movable* movable, MoveArea::AdoptionRoutine routine) {
-    auto routineIt{suppressedRoutines.find(movable)};
-    if (routineIt == suppressedRoutines.end()) suppressedRoutines.emplace(movable, movable->routine);
-    movable->routine = routine;
+    auto routineIt{pSuppressedRoutines.find(movable)};
+    if (routineIt == pSuppressedRoutines.end()) pSuppressedRoutines.emplace(movable, movable->pRoutine);
+    movable->pRoutine = std::move(routine);
 }
 
 void ScrolledMovePanel::restoreRoutine(Movable* movable) {
     if (!movable) return;
-    auto routineIt{suppressedRoutines.find(movable)};
-    if (routineIt == suppressedRoutines.end()) return;
+    auto routineIt{pSuppressedRoutines.find(movable)};
+    if (routineIt == pSuppressedRoutines.end()) return;
 
-    movable->routine = routineIt->second;
-    suppressedRoutines.erase(routineIt);
+    movable->pRoutine = routineIt->second;
+    pSuppressedRoutines.erase(routineIt);
 }
 
 
 void ScrolledMovePanel::dragTick(wxTimerEvent&) {
-    auto dragWindow{moveArea->getDragWindow()};
+    auto *dragWindow{pMoveArea->getDragWindow()};
     if (!dragWindow) {
-        timer->Stop();
+        pTimer->Stop();
         return;
     }
 
     auto mousePos{wxGetMousePosition()};
-    auto physCanvasPos{canvas->GetScreenPosition()};
-    auto physCanvasSize{canvas->GetSize()};
-    static constexpr auto hotWidth{50};
+    auto physCanvasPos{pCanvas->GetScreenPosition()};
+    auto physCanvasSize{pCanvas->GetSize()};
+    static constexpr auto HOT_WIDTH{50};
 
-    auto leftHotEdge{wxRegion(physCanvasPos.x, physCanvasPos.y, hotWidth, physCanvasSize.y)};
-    auto rightHotEdge{wxRegion(physCanvasPos.x + physCanvasSize.x - hotWidth, physCanvasPos.y, hotWidth, physCanvasSize.y)};
-    auto topHotEdge{wxRegion(physCanvasPos.x, physCanvasPos.y, physCanvasSize.x, hotWidth)};
-    auto bottomHotEdge{wxRegion(physCanvasPos.x, physCanvasPos.y + physCanvasSize.y - hotWidth, physCanvasSize.x, hotWidth)};
+    auto leftHotEdge{wxRegion(physCanvasPos.x, physCanvasPos.y, HOT_WIDTH, physCanvasSize.y)};
+    auto rightHotEdge{wxRegion(physCanvasPos.x + physCanvasSize.x - HOT_WIDTH, physCanvasPos.y, HOT_WIDTH, physCanvasSize.y)};
+    auto topHotEdge{wxRegion(physCanvasPos.x, physCanvasPos.y, physCanvasSize.x, HOT_WIDTH)};
+    auto bottomHotEdge{wxRegion(physCanvasPos.x, physCanvasPos.y + physCanvasSize.y - HOT_WIDTH, physCanvasSize.x, HOT_WIDTH)};
 
     int8_t dirs{0};
 
@@ -330,19 +325,19 @@ void ScrolledMovePanel::dragTick(wxTimerEvent&) {
 
     if (!dirs) return;
     wxSize scrollDelta{
-        (dirs & LEFT ? -jogDistance : dirs & RIGHT ? jogDistance : 0), 
-        (dirs & UP ? -jogDistance : dirs & DOWN ? jogDistance : 0)
+        (dirs & LEFT ? -pJogDistance : dirs & RIGHT ? pJogDistance : 0), 
+        (dirs & UP ? -pJogDistance : dirs & DOWN ? pJogDistance : 0)
     };
     scroll(scrollDelta);
 }
 
 void ScrolledMovePanel::scroll(const wxSize& deltaAmt) {
-    auto vScrollRange{canvas->GetScrollRange(wxVERTICAL)};
-    auto vScrollPos{canvas->GetScrollPos(wxVERTICAL)};
-    auto vScrollPageSize{canvas->GetScrollPageSize(wxVERTICAL)};
-    auto hScrollRange{canvas->GetScrollRange(wxHORIZONTAL)};
-    auto hScrollPos{canvas->GetScrollPos(wxHORIZONTAL)};
-    auto hScrollPageSize{canvas->GetScrollPageSize(wxHORIZONTAL)};
+    auto vScrollRange{pCanvas->GetScrollRange(wxVERTICAL)};
+    auto vScrollPos{pCanvas->GetScrollPos(wxVERTICAL)};
+    auto vScrollPageSize{pCanvas->GetScrollPageSize(wxVERTICAL)};
+    auto hScrollRange{pCanvas->GetScrollRange(wxHORIZONTAL)};
+    auto hScrollPos{pCanvas->GetScrollPos(wxHORIZONTAL)};
+    auto hScrollPageSize{pCanvas->GetScrollPageSize(wxHORIZONTAL)};
 
     wxSize grow{0, 0};
     if ((hScrollPos == 0 && deltaAmt.x < 0) || 
@@ -357,12 +352,12 @@ void ScrolledMovePanel::scroll(const wxSize& deltaAmt) {
     auto virtCanvasSize{GetSize() + grow};
     SetSize(virtCanvasSize);
     SetMinSize(virtCanvasSize);
-    canvas->FitInside();
+    pCanvas->FitInside();
     hScrollPos += deltaAmt.x;
     vScrollPos += deltaAmt.y;
-    canvas->Scroll(hScrollPos, vScrollPos);
+    pCanvas->Scroll(hScrollPos, vScrollPos);
 
-    for (const auto child : GetChildren()) {
+    for (auto *const child : GetChildren()) {
         auto childPos{child->GetPosition()};
         if (grow.y && deltaAmt.y < 0) childPos.y -= deltaAmt.y;
         if (grow.x && deltaAmt.x < 0) childPos.x -= deltaAmt.x;
@@ -375,10 +370,10 @@ void ScrolledMovePanel::scroll(const wxSize& deltaAmt) {
 
 void ScrolledMovePanel::shrinkToFit(int8_t ignoreDirs) {
     // For some reason, GetViewStart doesn't work correctly, so we have to do this:
-    wxPoint usedAreaStart{canvas->GetScrollPos(wxHORIZONTAL), canvas->GetScrollPos(wxVERTICAL)};
-    auto usedAreaEnd{usedAreaStart + canvas->GetSize()};
+    wxPoint usedAreaStart{pCanvas->GetScrollPos(wxHORIZONTAL), pCanvas->GetScrollPos(wxVERTICAL)};
+    auto usedAreaEnd{usedAreaStart + pCanvas->GetSize()};
     
-    for (auto child : GetChildren()) {
+    for (auto *child : GetChildren()) {
         auto childStart{child->GetPosition()};
         auto childSize{child->GetSize()};
         auto childEnd{childStart + childSize};
@@ -395,36 +390,35 @@ void ScrolledMovePanel::shrinkToFit(int8_t ignoreDirs) {
     wxSize usedSize{usedAreaEnd.x - usedAreaStart.x, usedAreaEnd.y - usedAreaStart.y};
     SetSize(usedSize);
     SetMinSize(usedSize);
-    canvas->FitInside();
+    pCanvas->FitInside();
 
-    for (auto child : GetChildren()) {
+    for (auto *child : GetChildren()) {
         child->SetPosition(child->GetPosition() - usedAreaStart);
     }
 }
 
 
 Movable::Movable(MoveArea* moveParent) :
-    moveArea(moveParent) {
-    if (!moveArea) return;
+    pMoveArea(moveParent) {
+    if (!pMoveArea) return;
 
     Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& evt) { doGrab(evt); });
-    moveArea->addChildToStack(this);
+    pMoveArea->addChildToStack(this);
 };
 
 Movable::~Movable() {
-    if (!moveArea) return;
+    if (!pMoveArea) return;
 
-    moveArea->removeAdoptRoutine(this);
-    moveArea->removeChildFromStack(this);
+    pMoveArea->removeAdoptRoutine(this);
+    pMoveArea->removeChildFromStack(this);
 }
 
 
 bool Movable::hitTest(wxPoint point) const { 
     if (point.x < 0 || point.y < 0) return false;
-    auto thisSize{GetSize()};
-    if (point.x > thisSize.x || point.y > thisSize.y) return false;
 
-    return true;
+    auto thisSize{GetSize()};
+    return point.x <= thisSize.x && point.y <= thisSize.y;
 };
 
 void Movable::doOnGrab() {}
@@ -434,25 +428,25 @@ void Movable::doGrab(wxMouseEvent& evt) {
         wxMouseEvent newEvt(MOVECLICK_FALLTHROUGH);
         newEvt.SetPosition(ClientToScreen(evt.GetPosition()));
         newEvt.SetEventObject(this);
-        wxPostEvent(moveArea, newEvt);
+        wxPostEvent(pMoveArea, newEvt);
         return;
     }
 
     doOnGrab();
 
     auto startPos = this->GetScreenPosition();
-    moveArea->removeChildFromStack(this);
-    moveArea->dragWindow = this;
-    moveArea->calcDelta(nullptr);
-    moveArea->CaptureMouse();
+    pMoveArea->removeChildFromStack(this);
+    pMoveArea->mDragWindow = this;
+    pMoveArea->calcDelta(nullptr);
+    pMoveArea->CaptureMouse();
 
-    this->Reparent(moveArea);
-    this->Move(moveArea->ScreenToClient(startPos)); 
+    this->Reparent(pMoveArea);
+    this->Move(pMoveArea->ScreenToClient(startPos)); 
     auto mvEvt{wxMouseEvent(evt)};
     mvEvt.SetEventType(MV_START);
-    wxPostEvent(moveArea, mvEvt); 
+    wxPostEvent(pMoveArea, mvEvt); 
 }
 
-MoveArea* Movable::getMoveArea() { return moveArea; }
+MoveArea* Movable::getMoveArea() { return pMoveArea; }
 
 

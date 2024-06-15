@@ -28,7 +28,7 @@ namespace BladeStyles {
 class LayerStyle : public ColorStyle {
 public:
 
-    virtual StyleType getType() const override;
+     [[nodiscard]] StyleType getType() const override;
 
     static StyleGenerator get(const std::string& styleName);
     static const StyleMap& getMap();
@@ -40,6 +40,6 @@ private:
     static const StyleMap map;
 };
 
-}
+} // namespace BladeStyles
 
 

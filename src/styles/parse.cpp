@@ -21,6 +21,7 @@
 
 #include "log/logger.h"
 #include "styles/bladestyle.h"
+#include <algorithm>
 #include <cctype>
 #include <climits>
 #include <cstddef>
@@ -75,8 +76,10 @@ BladeStyle *BladeStyles::parseString(const std::string &styleStr, bool *foundSty
                 " got " + 
                 std::to_string(numTokenParams) +
                 ")");
+        delete style;
         return nullptr;
     }
+    style->comment = std::move(styleTokens->comment);
 
     for (size_t i{0}; i < numTokenParams; i++) {
         const auto *param{style->getParam(i < numParams ? i : numParams - 1)};
@@ -105,12 +108,13 @@ BladeStyle *BladeStyles::parseString(const std::string &styleStr, bool *foundSty
                 STYLECAST(BoolParam, param)->setBool(val);
                 break;
             default:
-                auto *style{parseString(tokenParam.rawStr, foundStyle)};
-                if (style == nullptr) {
+                auto *paramStyle{parseString(tokenParam.rawStr, foundStyle)};
+                if (!paramStyle) {
                     Logger::error("Failure while parsing parameter " + std::to_string(i + 1) + " in style " + styleTokens->name);
+                    delete style;
                     return nullptr;
                 }
-                STYLECAST(StyleParam, param)->setStyle(style);
+                STYLECAST(StyleParam, param)->setStyle(paramStyle);
                 break;
         }
     }
@@ -128,7 +132,7 @@ std::optional<std::string> BladeStyles::asString(const BladeStyle& style) {
     }
     auto type{style.getType()};
     if (type & BUILTIN) {
-        ret = '&';
+        ret += '&';
         ret += style.osName;
         return ret;
     }
@@ -142,7 +146,7 @@ std::optional<std::string> BladeStyles::asString(const BladeStyle& style) {
         }
     }
 
-    ret = style.osName;
+    ret += style.osName;
     if (!(style.getType() & FIXEDCOLOR)) ret += '<';
     for (auto *const param : style.getParams()) {
         if (shouldIndentParams) ret += "\n\t";
@@ -215,6 +219,7 @@ static std::optional<TokenizedStyle> tokenizeStyle(const std::string& styleStr) 
         commentIndex = localCommentIndex;
         if (!commentFound) break;
     }
+    std::sort(commentRanges.begin(), commentRanges.end());
 
     TokenizedStyle styleTokens;
 
@@ -236,7 +241,7 @@ static std::optional<TokenizedStyle> tokenizeStyle(const std::string& styleStr) 
 
         if (std::isalpha(characer) != 0) {
             auto nameBegin{i};
-            while (std::isalnum(styleStr.at(i))) { i++; }
+            while (i < styleStr.length() && std::isalnum(styleStr.at(i))) { i++; }
             styleTokens.name = styleStr.substr(nameBegin, i - nameBegin);
             nameEnd = i;
             break;
@@ -249,15 +254,20 @@ static std::optional<TokenizedStyle> tokenizeStyle(const std::string& styleStr) 
     }
     auto getCommentsInRange{[&commentRanges, &styleStr](size_t begin, size_t end) -> std::string {
         std::string ret;
-        for (const auto& [ cBegin, cEnd ] : commentRanges) {
-            if (cEnd < begin) continue;
-            if (cBegin > end) break;
+        for (const auto& [ cmntBegin, cmntEnd ] : commentRanges) {
+            if (cmntEnd < begin) continue;
+            if (cmntBegin > end) break;
 
             if (!ret.empty()) ret += '\n';
-            if (styleStr.at(cEnd - 1) == '/') { // is a block comment
-                ret += styleStr.substr(cBegin + 2, cEnd - cBegin - 4);
+            if (styleStr.at(cmntEnd - 1) == '/') { // is a block comment
+                auto contentBegin{std::find_if_not(std::next(styleStr.cbegin(), static_cast<int64_t>(cmntBegin + 2)), std::next(styleStr.cbegin(), static_cast<int64_t>(cmntEnd - 3)), isspace)};
+                // ***backwards*** lol
+                auto contentEnd{std::find_if_not(std::prev(styleStr.crend(), static_cast<int64_t>(cmntEnd - 2)), std::prev(styleStr.crend(), static_cast<int64_t>(cmntBegin + 2)), isspace)};
+                const char *subCStr{contentBegin.base()};
+                auto length{contentEnd.base() - contentBegin};
+                ret += std::string(subCStr, length);
             } else { // is a line comment
-                ret += styleStr.substr(cBegin + 2, cEnd - cBegin - 3);
+                ret += styleStr.substr(cmntBegin + 2, cmntEnd - cmntBegin - 3);
             }
         }
         return ret;

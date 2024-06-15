@@ -2,7 +2,7 @@
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek,
- * based on code from ProffieOS, copyright Fredrik Hubinette et al.
+ * partially based on code from ProffieOS, copyright Fredrik Hubinette et al.
  *
  * proffieconstructs/vector3d.cpp
  *
@@ -27,38 +27,38 @@ Vector3D::Vector3D(float val) : x(val), y(val), z(val) {}
 Vector3D::Vector3D(float xVal, float yVal, float zVal) : x(xVal), y(yVal), z(zVal) {}
 
 Vector3D Vector3D::operator+(const Vector3D& operand) const {
-    return Vector3D(x + operand.x, y + operand.y, z + operand.z);
+    return {x + operand.x, y + operand.y, z + operand.z};
 }
 
-Vector3D Vector3D::operator+(const float operand) const {
-    return Vector3D(x + operand, y + operand, z + operand);
+Vector3D Vector3D::operator+(float operand) const {
+    return {x + operand, y + operand, z + operand};
 }
 
 Vector3D Vector3D::operator-(const Vector3D& operand) const {
-    return Vector3D(x - operand.x, y - operand.y, z - operand.z);
+    return {x - operand.x, y - operand.y, z - operand.z};
 }
 
-Vector3D Vector3D::operator-(const float operand) const {
-    return Vector3D(x - operand, y - operand, z - operand);
+Vector3D Vector3D::operator-(float operand) const {
+    return {x - operand, y - operand, z - operand};
 }
 
 Vector3D Vector3D::operator-() const {
-    return Vector3D(-x, -y, -z);
+    return {-x, -y, -z};
 }
 
 Vector3D Vector3D::operator*(const Vector3D& operand) const {
-    return Vector3D(x * operand.x, y * operand.y, z * operand.z);
+    return {x * operand.x, y * operand.y, z * operand.z};
 }
 
-Vector3D Vector3D::operator*(const float operand) const {
-    return Vector3D(x * operand, y * operand, z * operand);
+Vector3D Vector3D::operator*(float operand) const {
+    return {x * operand, y * operand, z * operand};
 }
 Vector3D Vector3D::operator/(const Vector3D& operand) const {
-    return Vector3D(x / operand.x, y / operand.y, z / operand.z);
+    return {x / operand.x, y / operand.y, z / operand.z};
 }
 
-Vector3D Vector3D::operator/(const float operand) const {
-    return Vector3D(x / operand, y / operand, z / operand);
+Vector3D Vector3D::operator/(float operand) const {
+    return {x / operand, y / operand, z / operand};
 }
 
 Vector3D Vector3D::operator+=(const Vector3D& operand) {
@@ -89,16 +89,16 @@ Vector3D Vector3D::operator/=(const Vector3D& operand) {
     return *this;
 }
 
-float Vector3D::dot(const Vector3D& operand) {
+float Vector3D::dot(const Vector3D& operand) const {
     return (x * operand.x) + (y * operand.y) + (z * operand.z);
 }
 
-Vector3D Vector3D::cross(const Vector3D& operand) {
-    return Vector3D(
+Vector3D Vector3D::cross(const Vector3D& operand) const {
+    return {
             (y * operand.z) - (z * operand.y),
             (z * operand.x) - (x * operand.z),
             (x * operand.y) - (y * operand.x)
-            );
+            };
 }
 
 // Length squared
@@ -106,18 +106,18 @@ float Vector3D::length2() const {
     return (x * x) + (y * y) + (z * z);
 }
 float Vector3D::length() const {
-    return sqrt(length2());
+    return std::sqrt(length2());
 }
 
-void Vector3D::rotate90(float& a, float& b) {
-    auto tmp{b};
-    b = -a;
-    a = tmp;
+void Vector3D::rotate90(float& axisA, float& axisB) {
+    auto tmp{axisB};
+    axisB = -axisA;
+    axisA = tmp;
 }
 
-void Vector3D::rotate180(float& a, float& b) {
-    a = -a;
-    b = -b;
+void Vector3D::rotate180(float& axisA, float& axisB) {
+    axisA = -axisA;
+    axisB = -axisB;
 }
 
 // Rotate about the given axis
@@ -148,31 +148,31 @@ void Vector3D::rotateZ180() {
 Vector3D Vector3D::rotateX(float angle) const {
     float sin{std::sin(angle)};
     float cos{std::cos(angle)};
-    return Vector3D(
+    return {
             x, 
             (y * cos) + (z * sin), 
             (y * -sin) + (z * cos)
-        );
+        };
 }
 
 Vector3D Vector3D::rotateY(float angle) const {
     float sin{std::sin(angle)};
     float cos{std::cos(angle)};
-    return Vector3D(
+    return {
             (x * cos) - (z * sin),
             y,
             (y * sin) + (z * cos)
-        );
+        };
 }
 
 Vector3D Vector3D::rotateZ(float angle) const {
     float sin{std::sin(angle)};
     float cos{std::cos(angle)};
-    return Vector3D(
+    return {
             (x * cos) - (y * sin),
             (x * sin) + (y * cos),
             z
-        );
+        };
 }
 
 Vector3D Vector3D::rotate(float angle) const {
@@ -183,13 +183,13 @@ Vector3D Vector3D::rotate(float angle) const {
     auto newY{(x * sin) + (y * cos * cos) + (z * sin * cos)};
     auto newZ{(y * sin) + (y * -sin * cos) + (z * cos * cos)};
 
-    return Vector3D(newX, newY, newZ);
+    return {newX, newY, newZ};
 }
 
 Vector3D Vector3D::moveTowardsZero(float delta) const {
     auto oldLength{length()};
     auto newLength{oldLength - delta};
-    if (newLength <= 0.f) return Vector3D(0.f);
+    if (newLength <= 0.F) return {0.F};
     return (*this) * (newLength / oldLength);
 }
 

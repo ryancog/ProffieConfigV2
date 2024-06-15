@@ -137,11 +137,11 @@ using namespace BladeStyles;
 
 
 FixedColorStyle::FixedColorStyle(const char* osName, const char* humanName, const ColorData& color) :
-    ColorStyle(osName, humanName, {}, COLOR | FIXEDCOLOR), color(color) {}
+    ColorStyle(osName, humanName, {}, COLOR | FIXEDCOLOR), mColor(color) {}
 
 void FixedColorStyle::run(StylePreview::Blade&) {}
 
-ColorData FixedColorStyle::getColor(int32_t) { return color; }
+ColorData FixedColorStyle::getColor(int32_t) { return mColor; }
 
 StyleGenerator FixedColorStyle::get(const std::string& styleName) {
     const auto& mapIt{map.find(styleName)};

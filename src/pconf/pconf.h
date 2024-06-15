@@ -19,12 +19,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <optional>
-#include <memory>
-#include <stdint.h>
 
 namespace PConf {
 
@@ -34,8 +33,8 @@ struct Section;
 Entry* readEntry(std::istream& inStream, bool& isSection);
 Section* readSection(std::istream& inStream);
 
-void writeEntry(std::ostream& outStream, const Entry& entry, const int32_t depth = 0);
-void writeSection(std::ostream& outStream, const Section& section, const int32_t depth = 0);
+void writeEntry(std::ostream& outStream, const Entry& entry, int32_t depth = 0);
+void writeSection(std::ostream& outStream, const Section& section, int32_t depth = 0);
 
 std::unordered_set<std::string> setFromValue(const std::optional<std::string>& value);
 
@@ -45,25 +44,37 @@ enum class DataType {
 };
 
 struct Entry {
+    Entry() = default;
+    Entry(const Entry &) = default;
+    Entry(Entry &&) = delete;
+    Entry &operator=(const Entry &) = default;
+    Entry &operator=(Entry &&) = delete;
+    virtual ~Entry() = default;
+
     std::string name;
     std::optional<std::string> value{std::nullopt};
     std::optional<std::string> label{std::nullopt};
     std::optional<int32_t> labelNum{std::nullopt};
 
-    virtual DataType getType() const { return DataType::ENTRY; }
-    virtual ~Entry() {}
+    [[nodiscard]] virtual DataType getType() const { return DataType::ENTRY; }
 };
 
 struct Section : Entry {
-    std::vector<Entry*> entries;
-
-    virtual DataType getType() const { return DataType::SECTION; }
-    virtual ~Section() {
-        for (auto& entry : entries) {
-            if (entry) delete entry;
+    Section() = default;
+    Section(const Section &) = default;
+    Section(Section &&) = delete;
+    Section &operator=(const Section &) = default;
+    Section &operator=(Section &&) = delete;
+    ~Section() override {
+        for (auto &entry : entries) {
+            delete entry;
             entry = nullptr;
         }
     }
+
+    std::vector<Entry*> entries;
+
+    [[nodiscard]] DataType getType() const override { return DataType::SECTION; }
 };
 
-}
+} // namespace PConf

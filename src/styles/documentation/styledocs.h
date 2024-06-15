@@ -20,7 +20,6 @@
  */
 
 #include <string>
-#include <vector>
 
 namespace BladeStyles::Documentation {
 
@@ -28,4 +27,4 @@ void open(const std::string& styleName = "");
 void showPage(const std::string& styleName = "");
 void goHome();
 
-}
+} // namespace BladeStyles::Documentation

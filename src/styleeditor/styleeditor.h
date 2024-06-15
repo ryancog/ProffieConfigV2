@@ -25,4 +25,4 @@ namespace StyleEditor {
 
 void launch(wxWindow* parent);
 
-}
+} // namespace StyleEditor

@@ -19,49 +19,103 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
 #include <optional>
 
+#include <wx/button.h>
+#include <wx/clipbrd.h>
+#include <wx/colour.h>
+#include <wx/dataobj.h>
 #include <wx/dc.h>
 #include <wx/dcclient.h>
-#include <wx/settings.h>
-#include <wx/colour.h>
-#include <wx/button.h>
 #include <wx/event.h>
 #include <wx/gdicmn.h>
 #include <wx/graphics.h>
-#include <wx/string.h>
-#include <wx/sizer.h>
 #include <wx/menu.h>
-#include <wx/clipbrd.h>
-#include <wx/dataobj.h>
+#include <wx/settings.h>
+#include <wx/sizer.h>
+#include <wx/string.h>
 
+#include "log/logger.h"
 #include "styleeditor/blocks/bitsctrl.h"
-#include "styles/documentation/styledocs.h"
 #include "styles/bladestyle.h"
-#include "styles/elements/args.h"
-#include "styles/elements/colors.h"
-#include "styles/elements/effects.h"
-#include "styles/elements/lockuptype.h"
+#include "styles/documentation/styledocs.h"
 #include "styles/parse.h"
 #include "ui/bool.h"
 #include "ui/numeric.h"
 
-using namespace PCUI;
+namespace PCUI {
 
-wxDEFINE_EVENT(PCUI::SB_COLLAPSED, wxCommandEvent);
+wxDEFINE_EVENT(SB_COLLAPSED, wxCommandEvent);
+
 std::unordered_map<const BladeStyles::BladeStyle*, StyleBlock*> StyleBlock::blockMap;
 
+const wxColour* StyleBlock::textColor;
+const wxColour* StyleBlock::faceColor;
+const wxColour* StyleBlock::bgColor;
+const wxColour* StyleBlock::dimColor;
+const wxColour* StyleBlock::hlColor;
+
+const wxColour* StyleBlock::builtinColor;
+const wxColour* StyleBlock::function3DColor;
+const wxColour* StyleBlock::timeFuncColor;
+const wxColour* StyleBlock::wrapperColor;
+const wxColour* StyleBlock::transitionColor;
+const wxColour* StyleBlock::functionColor;
+const wxColour* StyleBlock::colorColor;
+const wxColour* StyleBlock::layerColor;
+const wxColour* StyleBlock::colorLayerColor;
+const wxColour* StyleBlock::effectColor;
+const wxColour* StyleBlock::lockupTypeColor;
+const wxColour* StyleBlock::argumentColor;
+
+void StyleBlock::initStatic() {
+    static bool initialized{false};
+    if (initialized) return;
+
+    // NOLINTBEGIN(readability-magic-numbers)
+    // textColor = new wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNTEXT));
+    textColor = new wxColour(255, 255, 255);
+    faceColor = new wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
+    bgColor   = new wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
+    dimColor  = new wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_GRAYTEXT));
+    hlColor   = new wxColour(wxSystemSettings::GetColour(wxSYS_COLOUR_HIGHLIGHT));
+
+    builtinColor    = new wxColour(144, 129, 114); // Grey 
+    function3DColor = new wxColour( 50, 116,  63); // Green
+    timeFuncColor   = new wxColour( 50, 116,  63); // Green
+    wrapperColor    = new wxColour(144, 129, 114); // Grey
+    transitionColor = new wxColour( 47, 101, 179); // Blue
+    functionColor   = new wxColour( 50, 116,  63); // Green
+    colorColor      = new wxColour(217,  64,  64); // Red
+    layerColor      = new wxColour(214, 102,   0); // Orange
+    colorLayerColor = new wxColour(170,  56,   0);
+    effectColor     = new wxColour(209, 132, 153); // Pink
+    lockupTypeColor = new wxColour(214,  53,  97); // Different Pink
+    argumentColor   = new wxColour(101,  45, 144); // Deep Purple
+    // NOLINTEND(readability-magic-numbers)
+    initialized = true;
+}
+
 StyleBlock::StyleBlock(MoveArea* moveParent, wxWindow* parent, BladeStyles::BladeStyle* style) :
-    Block(parent, style->getType()),
     Movable(moveParent),
-    style(style),
-    name(style->humanName) {
+    type(style->getType()),
+    pStyle(style),
+    mName(style->humanName) {
+    initStatic();
+
+#	ifndef __WXGTK__
+    // current wx build complains about GDK compositing with this.
+    // Required on Win32. I think it's responsible for eliminating
+    // the flickers, since what it's really doing is enabling compositing.
+    SetBackgroundStyle(wxBG_STYLE_TRANSPARENT);
+# 	endif
+
+    Create(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, "StyleBlock");
 
     SetName("StyleBlock");
     blockMap.emplace(style, this);
 
-    routine = std::bind(&StyleBlock::tryAdopt, this, std::placeholders::_1, std::placeholders::_2);
+    pRoutine = [this](auto&& PH1, auto&& PH2) { return tryAdopt(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2)); };
     bindEvents();
 
     bindChildren();
@@ -70,80 +124,82 @@ StyleBlock::StyleBlock(MoveArea* moveParent, wxWindow* parent, BladeStyles::Blad
 }
 
 StyleBlock::~StyleBlock() {
-    if (moveArea) moveArea->removeAdoptRoutine(this);
-    blockMap.erase(blockMap.find(style));
+    if (pMoveArea) pMoveArea->removeAdoptRoutine(this);
+    blockMap.erase(blockMap.find(pStyle));
 }
 
 void StyleBlock::bindEvents() {
-    Block::Bind(wxEVT_PAINT, [&](wxPaintEvent& evt) { paintEvent(evt); });
-    Block::Bind(wxEVT_MIDDLE_DOWN, [&](wxMouseEvent&) { collapse(!collapsed); });
-    Block::Bind(wxEVT_RIGHT_DOWN, [&](wxMouseEvent& evt) { showPopMenu(evt); });
-    Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { collapse(!collapsed); }, COLLAPSE);
-    Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { 
+    Bind(wxEVT_PAINT, [&](wxPaintEvent& evt) { paintEvent(evt); });
+    Bind(wxEVT_MIDDLE_DOWN, [&](wxMouseEvent&) { collapse(!mCollapsed); });
+    Bind(wxEVT_RIGHT_DOWN, [&](wxMouseEvent& evt) { showPopMenu(evt); });
+    Bind(wxEVT_MENU, [&](wxCommandEvent&) { collapse(!mCollapsed); }, COLLAPSE);
+    Bind(wxEVT_MENU, [&](wxCommandEvent&) { 
         if (!wxClipboard::Get()->Open()) return;
         wxClipboard::Get()->SetData(new wxTextDataObject(getString().value_or("INVALID STYLE")));
         wxClipboard::Get()->Close();
     }, COPY);
-    Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { 
+    Bind(wxEVT_MENU, [&](wxCommandEvent&) { 
         if (!wxClipboard::Get()->Open()) return;
         wxClipboard::Get()->SetData(new wxTextDataObject(getString().value_or("INVALID STYLE")));
         wxClipboard::Get()->Close();
         Destroy();
     }, CUT);
-    Block::Bind(wxEVT_MENU, [&](wxCommandEvent&) { BladeStyles::Documentation::open(name.ToStdString()); }, HELP);
+    Bind(wxEVT_MENU, [&](wxCommandEvent&) { BladeStyles::Documentation::open(mName.ToStdString()); }, HELP);
 }
 
 void StyleBlock::bindChildren() {
-    for (const auto& param : style->getParams()) {
+    for (const auto& param : pStyle->getParams()) {
         if (!(param->getType() & BladeStyles::STYLETYPE)) continue;
-        auto styleParam{static_cast<const BladeStyles::StyleParam*>(param)};
-        auto style{styleParam->getStyle()};
+        const auto *styleParam{static_cast<const BladeStyles::StyleParam*>(param)};
+        const auto *style{styleParam->getStyle()};
         if (!style) continue;
 
-        new StyleBlock(moveArea, this, const_cast<BladeStyles::BladeStyle*>(style));
+        new StyleBlock(pMoveArea, this, const_cast<BladeStyles::BladeStyle*>(style));
     }
 }
 
 std::optional<std::string> StyleBlock::getString() const { 
-    auto style{getStyle()};
+    const auto *style{getStyle()};
     auto ret{BladeStyles::asString(*style)};
     delete style;
     return ret;
 }
 
-const BladeStyles::BladeStyle* StyleBlock::getStyle() const { return style; }
-bool StyleBlock::isCollapsed() const { return collapsed; }
+const BladeStyles::BladeStyle* StyleBlock::getStyle() const { 
+    return pStyle; 
+}
+bool StyleBlock::isCollapsed() const { return mCollapsed; }
 
 void StyleBlock::initHelp() {
-    helpButton = new wxButton(this, HELP, " ? ", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+    mHelpButton = new wxButton(this, HELP, " ? ", wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
     Bind(wxEVT_BUTTON, [&](wxCommandEvent&){
-        BladeStyles::Documentation::open(name.ToStdString());
+        BladeStyles::Documentation::open(mName.ToStdString());
     });
 }
 
 void StyleBlock::doOnGrab() {
-    auto parentBlock{dynamic_cast<StyleBlock*>(GetParent())};
+    auto *parentBlock{dynamic_cast<StyleBlock*>(GetParent())};
     if (!parentBlock) return;
 
-    for (auto param : parentBlock->style->getParams()) {
+    for (auto *param : parentBlock->pStyle->getParams()) {
         if (!(param->getType() & BladeStyles::STYLETYPE)) continue;
-        auto styleParam{static_cast<BladeStyles::StyleParam*>(param)};
+        auto *styleParam{static_cast<BladeStyles::StyleParam*>(param)};
 
-        if (styleParam->getStyle() != style) continue;
+        if (styleParam->getStyle() != pStyle) continue;
         // We *are* the style, so we can ignore the return.
         (void)styleParam->detachStyle();
     }
 }
 
 bool StyleBlock::tryAdopt(Movable* window, wxPoint pos) {
-        auto block{dynamic_cast<StyleBlock*>(window)};
+        auto *block{dynamic_cast<StyleBlock*>(window)};
         if (!block) return false;
 
         const BladeStyles::Param* paramToFill{nullptr};
 
-        for (size_t i{0}; i < paramsData.size(); i++) {
-            auto& paramData{paramsData.at(i)};
-            auto param{style->getParam(i)};
+        for (size_t i{0}; i < mParamsData.size(); i++) {
+            auto& paramData{mParamsData.at(i)};
+            const auto *param{pStyle->getParam(i)};
             if (paramData.control) continue;
 
             auto typesEqual{param->getType() & block->type & BladeStyles::FLAGMASK};
@@ -156,7 +212,7 @@ bool StyleBlock::tryAdopt(Movable* window, wxPoint pos) {
                     pos.x > paramScreenLoc.x &&
                     pos.x < blockScreenEdge.x &&
                     pos.y > paramScreenLoc.y &&
-                    pos.y < paramScreenLoc.y + paramData.rectSize.y + (borderThickness * 2)
+                    pos.y < paramScreenLoc.y + paramData.rectSize.y + (borderThickness() * 2)
                ) {
                 paramToFill = param;
                 break;
@@ -164,9 +220,9 @@ bool StyleBlock::tryAdopt(Movable* window, wxPoint pos) {
         }
 
         if (!paramToFill) return false;
-        auto styleParam{static_cast<const BladeStyles::StyleParam*>(paramToFill)};
+        const auto *styleParam{static_cast<const BladeStyles::StyleParam*>(paramToFill)};
 
-        auto paramStyle{styleParam->getStyle()};
+        const auto *paramStyle{styleParam->getStyle()};
         if (paramStyle) return blockMap.find(paramStyle)->second->tryAdopt(window, pos);    
 
         const_cast<BladeStyles::StyleParam*>(styleParam)->setStyle(const_cast<BladeStyles::BladeStyle*>(block->getStyle()));
@@ -179,17 +235,15 @@ bool StyleBlock::tryAdopt(Movable* window, wxPoint pos) {
 
 bool StyleBlock::hitTest(wxPoint point) const {
     if (point.x < 0 || point.y < 0) return false;
-    if (point.x > size.x || point.y > size.y) return false;
+    if (point.x > mRectSize.x || point.y > mRectSize.y) return false;
 
-    for (const auto& param : paramsData) {
+    for (const auto& param : mParamsData) {
         if (
                 point.x > param.rectPos.x && 
                 point.x < param.rectPos.x + param.rectSize.x &&
                 point.y > param.rectPos.y &&
                 point.y < param.rectPos.y + param.rectSize.y
-           ) {
-            return false;
-        }
+           ) return false;
     }
 
     return true;
@@ -197,17 +251,14 @@ bool StyleBlock::hitTest(wxPoint point) const {
 
 void StyleBlock::update(bool repaint) {
     calc();
-    if (repaint) paintNow();
+    if (repaint) Update();
     updateElementPos();
-    auto sizeToSet{collapsed ? rectSize : size};
-    Block::SetSize(sizeToSet);
-    Block::SetMinSize(sizeToSet);
 }
 
 void StyleBlock::recurseUpdate(bool repaint) {
     update(repaint);
 
-    auto styleBlockParent{dynamic_cast<StyleBlock*>(GetParent())};
+    auto *styleBlockParent{dynamic_cast<StyleBlock*>(GetParent())};
     if (!styleBlockParent) {
         GetParent()->Layout();
         return;
@@ -217,13 +268,24 @@ void StyleBlock::recurseUpdate(bool repaint) {
 }
 
 void StyleBlock::collapse(bool collapse) {
-    if (paramsData.size() == 0) return;
-    if (collapse == collapsed) return;
+    if (mParamsData.empty()) return;
+    if (collapse == mCollapsed) return;
 
-    collapsed = collapse;
+    mCollapsed = collapse;
     recurseUpdate();
 
     wxPostEvent(GetEventHandler(), wxCommandEvent(SB_COLLAPSED));
+}
+
+void StyleBlock::setScale(float val) { 
+    mScale = val; 
+    for (auto *const param : pStyle->getParams()) {
+        if (!(param->getType() & BladeStyles::STYLETYPE)) continue;
+
+        auto blockIt{blockMap.find(static_cast<BladeStyles::StyleParam*>(param)->getStyle())};
+        if (blockIt == blockMap.end()) continue;
+        blockIt->second->setScale(val);
+    }
 }
 
 void StyleBlock::showPopMenu(wxMouseEvent& evt) {
@@ -232,7 +294,7 @@ void StyleBlock::showPopMenu(wxMouseEvent& evt) {
     menu.Append(COPY, "Copy");
     menu.Append(CUT, "Cut");
     menu.AppendSeparator();
-    menu.Append(COLLAPSE, collapsed ? "Expand" : "Collapse");
+    menu.Append(COLLAPSE, mCollapsed ? "Expand" : "Collapse");
     menu.AppendSeparator();
     menu.Append(HELP, "View StyleDoc");
 
@@ -240,70 +302,71 @@ void StyleBlock::showPopMenu(wxMouseEvent& evt) {
 }
 
 void StyleBlock::calc() {
-    wxPoint drawLocation{edgePadding, edgePadding};
-    size.Set(drawLocation.x, drawLocation.y);
-    rectSize.Set(-1, -1);
+    constexpr auto EMPTY_RECT_HEIGHT{30};
+    wxPoint drawLocation{edgePadding(), edgePadding()};
+    mSize.Set(drawLocation.x, drawLocation.y);
+    mRectSize.Set(-1, -1);
 
     switch (type & BladeStyles::FLAGMASK) {
         case BladeStyles::BUILTIN:
         case BladeStyles::WRAPPER:
-            color = wrapperColor;
+            mColor = wrapperColor;
             break;
         case BladeStyles::COLOR:
-            color = colorColor;
+            mColor = colorColor;
             break;
         case BladeStyles::LAYER:
-            color = layerColor;
+            mColor = layerColor;
             break;
         case BladeStyles::FUNCTION:
-            color = functionColor;
+            mColor = functionColor;
             break;
         case BladeStyles::TRANSITION:
-            color = transitionColor;
+            mColor = transitionColor;
             break;
         case BladeStyles::EFFECT:
-            color = effectColor;
+            mColor = effectColor;
             break;
         default:
-            color = nullptr;
+            mColor = nullptr;
     }
 
-    auto dc{wxClientDC(this)};
-    auto headerTextSize{dc.GetTextExtent(name)};
-    headerTextPos = drawLocation;
+    auto clientDC{wxClientDC(this)};
+    auto headerTextSize{clientDC.GetTextExtent(mName)};
+    mHeaderTextPos = drawLocation;
     drawLocation.y += headerTextSize.y;
-    if (drawLocation.y > size.y) size.y = drawLocation.y;
-    if (drawLocation.x + headerTextSize.x > size.x) size.x = drawLocation.x + headerTextSize.x;
-    if (drawLocation.x + headerTextSize.x > rectSize.x) rectSize.x = drawLocation.x + headerTextSize.x;
+    if (drawLocation.y > mSize.y) mSize.y = drawLocation.y;
+    if (drawLocation.x + headerTextSize.x > mSize.x) mSize.x = drawLocation.x + headerTextSize.x;
+    if (drawLocation.x + headerTextSize.x > mRectSize.x) mRectSize.x = drawLocation.x + headerTextSize.x;
 
-    auto& params{style->getParams()};
-    if (params.size() > 0) {
-        drawLocation.y += internalPadding;
-        headerBarPos = drawLocation;
-        drawLocation.y += internalPadding;
-        if (drawLocation.y > size.y) size.y = drawLocation.y;
+    const auto& params{pStyle->getParams()};
+    if (!params.empty()) {
+        drawLocation.y += internalPadding();
+        mHeaderBarPos = drawLocation;
+        drawLocation.y += internalPadding();
+        if (drawLocation.y > mSize.y) mSize.y = drawLocation.y;
 
-        drawLocation.x += edgePadding * 2;
-        if (drawLocation.x > size.x) size.x = drawLocation.x;
+        drawLocation.x += edgePadding() * 2;
+        if (drawLocation.x > mSize.x) mSize.x = drawLocation.x;
     }
 
-    paramsData.resize(params.size());
+    mParamsData.resize(params.size());
     for (size_t i{0}; i < params.size(); i++) {
         using namespace BladeStyles;
 
-        auto param{params.at(i)};
-        auto& data{paramsData.at(i)};
+        auto *param{params.at(i)};
+        auto& data{mParamsData.at(i)};
         data.colors.clear();
 
         auto paramType{param->getType()};
-        auto paramStyle{static_cast<StyleParam*>(param)->getStyle()};
+        const auto *paramStyle{static_cast<StyleParam*>(param)->getStyle()};
         if ((paramType & STYLETYPE) && paramStyle) {
-            data.rectSize = blockMap.find(paramStyle)->second->GetSize();
+            data.rectSize = getInverseScale(blockMap.find(paramStyle)->second->GetSize());
         } else if (data.control) {
             data.rectSize = data.control->GetBestSize();
         } else {
             data.rectSize.x = -1;
-            data.rectSize.y = 30;
+            data.rectSize.y = EMPTY_RECT_HEIGHT;
         }
 
         if (paramType & WRAPPER) {
@@ -315,13 +378,13 @@ void StyleBlock::calc() {
         } if (paramType & FUNCTION3D) {
             data.colors.push_back(function3DColor);
 		} if (paramType & NUMBER) {
-            auto numberParam{static_cast<NumberParam*>(param)};
-            if (!data.control) data.control = new PCUI::Numeric(this, wxID_ANY, wxEmptyString, wxDefaultSize, 0, -32768, 32768, numberParam->getNum());
+            auto *numberParam{static_cast<NumberParam*>(param)};
+            if (!data.control) data.control = new PCUI::Numeric(this, wxID_ANY, wxEmptyString, wxDefaultSize, 0, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max() + 1, numberParam->getNum());
 		} if (paramType & BITS) {
-            auto bitsParam{static_cast<BitsParam*>(param)};
-            if (!data.control) data.control = new PCUI::BitsCtrl(this, wxID_ANY, 16, bitsParam->getBits(), wxEmptyString, wxDefaultSize);
+            auto *bitsParam{static_cast<BitsParam*>(param)};
+            if (!data.control) data.control = new PCUI::BitsCtrl(this, wxID_ANY, sizeof(int16_t) * CHAR_BIT, bitsParam->getBits(), wxEmptyString, wxDefaultSize);
 		} if (paramType & BOOL) {
-            auto boolParam{static_cast<BoolParam*>(param)};
+            auto *boolParam{static_cast<BoolParam*>(param)};
             if (!data.control) data.control = new PCUI::Bool(this, wxID_ANY, boolParam->getBool());
 		} if (paramType & COLOR) {
             data.colors.push_back(colorColor);
@@ -340,68 +403,89 @@ void StyleBlock::calc() {
         }
 
         data.textPos = drawLocation;
-        drawLocation.y += internalPadding;
-        auto argTextSize{dc.GetTextExtent(param->name)};
+        drawLocation.y += internalPadding();
+        auto argTextSize{clientDC.GetTextExtent(param->name)};
         drawLocation.y += argTextSize.y;
-        if (drawLocation.x + argTextSize.x > size.x) size.x = drawLocation.x + argTextSize.x;
-        if (drawLocation.x + argTextSize.x > rectSize.x) rectSize.x = drawLocation.x + argTextSize.x;
+        if (drawLocation.x + argTextSize.x > mSize.x) mSize.x = drawLocation.x + argTextSize.x;
+        if (drawLocation.x + argTextSize.x > mRectSize.x) mRectSize.x = drawLocation.x + argTextSize.x;
 
         data.rectPos = drawLocation;
         drawLocation.y += data.rectSize.y;
-        if (drawLocation.x + data.rectSize.x > size.x){
-            if (paramStyle && rectSize.x == -1) {
-                // Freeze smaller size
-                rectSize.x = size.x;
+        if (drawLocation.x + data.rectSize.x > mSize.x){
+            if (paramStyle && mRectSize.x == -1) {
+                // Freeze smaller mSize
+                mRectSize.x = mSize.x;
             }
 
-            size.x = drawLocation.x + data.rectSize.x;
+            mSize.x = drawLocation.x + data.rectSize.x;
         }
-        if (data.control && drawLocation.x + data.rectSize.x > rectSize.x) {
-            rectSize.x = drawLocation.x + data.rectSize.x;
+        if (data.control && drawLocation.x + data.rectSize.x > mRectSize.x) {
+            mRectSize.x = drawLocation.x + data.rectSize.x;
         }
-        if (paramType & BladeStyles::FUNCTION) {
-            drawLocation.y += borderThickness;
+        if (paramType & BladeStyles::STYLETYPE) {
+            drawLocation.y += borderThickness() * 2;
         }
-        drawLocation.y += internalPadding * 2;
+        drawLocation.y += internalPadding() * 2;
 
         if (paramType & BladeStyles::REFMASK) {
-            const auto refNum{(paramType & BladeStyles::REFMASK) >> 16};
-            auto refTextSize{dc.GetTextExtent(params.at(refNum - 1)->name)};
-            if (drawLocation.x + refTextSize.x + (internalPadding * 2) > size.x) size.x = drawLocation.x + refTextSize.x + (internalPadding * 2);
+            const auto refNum{getRefFromType(paramType)};
+            auto refTextSize{clientDC.GetTextExtent(params.at(refNum - 1)->name)};
+            if (drawLocation.x + refTextSize.x + (internalPadding() * 2) > mSize.x) mSize.x = drawLocation.x + refTextSize.x + (internalPadding() * 2);
         }
     }
-    if (drawLocation.y > size.y) size.y = drawLocation.y;
+    if (drawLocation.y > mSize.y) mSize.y = drawLocation.y;
 
-    if (rectSize.x == -1) rectSize.x = size.x;
-    if (rectSize.y == -1) rectSize.y = size.y;
+    if (mRectSize.x == -1) mRectSize.x = mSize.x;
+    if (mRectSize.y == -1) mRectSize.y = mSize.y;
 
-    auto helpButtonSize{helpButton->GetSize()};
-    auto hbNeededWidth{headerTextPos.x + headerTextSize.x + internalPadding + helpButtonSize.x};
-    if (hbNeededWidth > size.x) size.x = hbNeededWidth;
-    if (hbNeededWidth > rectSize.x) rectSize.x = hbNeededWidth;
+    auto helpButtonSize{mHelpButton->GetBestSize()};
+    auto hbNeededWidth{mHeaderTextPos.x + headerTextSize.x + internalPadding() + helpButtonSize.x};
+    if (hbNeededWidth > mSize.x) mSize.x = hbNeededWidth;
+    if (hbNeededWidth > mRectSize.x) mRectSize.x = hbNeededWidth;
 
-    helpPos.x = rectSize.x - helpButtonSize.x;
+    mHelpPos.x = mRectSize.x - helpButtonSize.x;
 
-    if (collapsed) {
-        size.y = rectSize.y = headerTextPos.y + headerTextSize.y + internalPadding; 
+    if (mCollapsed) {
+        mSize.y = mRectSize.y = mHeaderTextPos.y + headerTextSize.y + internalPadding(); 
     }
 
-    rectSize.x += edgePadding;
-    rectSize.y += edgePadding;
+    mRectSize.x += edgePadding();
+    mRectSize.y += edgePadding();
 
-    if (paramsData.size() > 0) helpPos.y = (headerBarPos.y - helpButtonSize.y) / 2;
-    else helpPos.y = (rectSize.y - helpButtonSize.y) / 2;
+    if (!mParamsData.empty()) mHelpPos.y = (mHeaderBarPos.y - helpButtonSize.y) / 2;
+    else mHelpPos.y = (mRectSize.y - helpButtonSize.y) / 2;
 
-    if (size.x < rectSize.x) size.x = rectSize.x;
-    if (size.y < rectSize.y) size.y = rectSize.y;
-    size.x += borderThickness; // For block borders
+    if (mSize.x < mRectSize.x) mSize.x = mRectSize.x;
+    if (mSize.y < mRectSize.y) mSize.y = mRectSize.y;
+    mSize.x += borderThickness(); // For block borders
+    
+    scaleValue(mHelpPos);
+    mHelpButton->SetSize(getScaled(helpButtonSize));
+    scaleValue(mSize);
+    scaleValue(mRectSize);
+    scaleValue(mHeaderBarPos);
+    scaleValue(mHeaderTextPos);
+    for (auto &param : mParamsData) {
+        scaleValue(param.textPos);
+        scaleValue(param.rectPos);
+
+        scaleValue(param.rectSize.y);
+        if (param.rectSize.x != -1) scaleValue(param.rectSize.x);
+    }
+
+    auto mSizeToSet{mCollapsed ? mRectSize : mSize};
+    SetSize(mSizeToSet);
+    SetMinSize(mSizeToSet);
 }
 
 void StyleBlock::updateElementPos() {
-    helpButton->SetPosition(helpPos);
-    for (size_t i{0}; i < paramsData.size(); i++) {
-        auto& paramData{paramsData.at(i)};
-        auto param{style->getParam(i)};
+    auto font{wxSystemSettings::GetFont(wxSystemFont::wxSYS_DEFAULT_GUI_FONT)};
+    font.SetPixelSize(getScaled(font.GetPixelSize()));
+    mHelpButton->SetPosition(mHelpPos);
+    mHelpButton->SetFont(font);
+    for (size_t i{0}; i < mParamsData.size(); i++) {
+        auto& paramData{mParamsData.at(i)};
+        const auto *param{pStyle->getParam(i)};
 
         switch (param->getType() & BladeStyles::FLAGMASK) {
             case BladeStyles::BITS:
@@ -409,89 +493,97 @@ void StyleBlock::updateElementPos() {
             case BladeStyles::BOOL: {
                 paramData.control->SetPosition(paramData.rectPos);
                 paramData.control->SetSize(paramData.rectSize);
+                paramData.control->SetFont(font);
                 break; }
             default:
-                auto style{static_cast<const BladeStyles::StyleParam*>(param)->getStyle()};
+                const auto *style{static_cast<const BladeStyles::StyleParam*>(param)->getStyle()};
                 auto block{blockMap.find(style)};
                 if (block == blockMap.end()) continue;
 
                 block->second->SetPosition({
-                        paramData.rectPos.x + borderThickness,
-                        paramData.rectPos.y + borderThickness,
+                        paramData.rectPos.x + borderThickness(),
+                        paramData.rectPos.y + borderThickness(),
                         });
                 break;
         };
     }
 }
 
-void StyleBlock::render(wxDC& dc) {
-    dc.SetBrush(wxBrush(*faceColor));
+void StyleBlock::render(wxDC& devContext) {
+    constexpr auto BORDER_LIGHT_DEC{80};
+    constexpr auto BG_LIGHT_INCREASE{130};
 
-    if (color) {
-        dc.SetPen(wxPen(color->ChangeLightness(130), 1));
-        dc.SetBrush(wxBrush(*color));
+    devContext.SetBrush(wxBrush(*faceColor));
+    auto font{devContext.GetFont()};
+    font.SetPixelSize(getScaled(font.GetPixelSize()));
+    devContext.SetFont(font);
+
+    if (mColor) {
+        devContext.SetPen(wxPen(mColor->ChangeLightness(BG_LIGHT_INCREASE), 1));
+        devContext.SetBrush(wxBrush(*mColor));
     }
 
-    dc.SetClippingRegion(0, 0, rectSize.x, rectSize.y);
-    dc.DrawRoundedRectangle(0, 0, rectSize.x, rectSize.y, 5);
+    devContext.SetClippingRegion(0, 0, mRectSize.x, mRectSize.y);
+    devContext.DrawRoundedRectangle(0, 0, mRectSize.x, mRectSize.y, rectangeRadius());
 
-    dc.SetTextForeground(*textColor);
-    dc.DrawText(name, headerTextPos.x, headerTextPos.y);
+    devContext.SetTextForeground(*textColor);
+    devContext.DrawText(mName, mHeaderTextPos.x, mHeaderTextPos.y);
 
-    if (paramsData.size() > 0) {
-        dc.SetPen(*textColor);
-        dc.DrawLine(headerBarPos.x, headerBarPos.y, rectSize.x - edgePadding, headerBarPos.y);
+    if (!mParamsData.empty()) {
+        devContext.SetPen(*textColor);
+        devContext.DrawLine(mHeaderBarPos.x, mHeaderBarPos.y, mRectSize.x - edgePadding(), mHeaderBarPos.y);
     }
 
-    if (collapsed) return;
+    if (mCollapsed) return;
 
-    auto& params{style->getParams()};
-    for (size_t i{0}; i < paramsData.size(); i++) {
-        auto param{params.at(i)};
-        auto& data{paramsData.at(i)};
-        dc.SetTextForeground(*textColor);
-        dc.DrawText(param->name, data.textPos.x, data.textPos.y);
+    const auto& params{pStyle->getParams()};
+    for (size_t i{0}; i < mParamsData.size(); i++) {
+        auto *param{params.at(i)};
+        auto& data{mParamsData.at(i)};
+        devContext.SetTextForeground(*textColor);
+        devContext.DrawText(param->name, data.textPos.x, data.textPos.y);
 
         if (!(param->getType() & BladeStyles::STYLETYPE)) continue;
 
         auto blockBoxSize{data.rectSize};
-        blockBoxSize.x = size.x;
+        blockBoxSize.x = mSize.x;
 
-        const wxColour* paramColor{data.colors.size() ? data.colors.at(0) : nullptr};
-        if (color && paramColor) {
-            dc.SetBrush(*paramColor);
-            dc.SetPen(color->ChangeLightness(80));
+        const wxColour* paramColor{!data.colors.empty() ? data.colors.at(0) : nullptr};
+        if (mColor && paramColor) {
+            devContext.SetBrush(*paramColor);
+            devContext.SetPen(mColor->ChangeLightness(BORDER_LIGHT_DEC));
         } else {
-            dc.SetBrush(*dimColor);
-            dc.SetPen(*dimColor);
+            devContext.SetBrush(*dimColor);
+            devContext.SetPen(*dimColor);
         }
-        dc.DrawRoundedRectangle(
+        devContext.DrawRoundedRectangle(
                                 data.rectPos.x,
                                 data.rectPos.y,
-                                blockBoxSize.x + (2 * borderThickness),
-                                blockBoxSize.y + (2 * borderThickness),
-                                6);
+                                blockBoxSize.x + (2 * borderThickness()),
+                                blockBoxSize.y + (2 * borderThickness()),
+                                rectangeRadius() + 1);
 
         if (paramColor) {
-            dc.SetPen(*wxTRANSPARENT_PEN);
-            dc.SetBrush(paramColor->ChangeLightness(130));
+            devContext.SetPen(*wxTRANSPARENT_PEN);
+            devContext.SetBrush(paramColor->ChangeLightness(BG_LIGHT_INCREASE));
         } else {
-            dc.SetPen(*dimColor);
-            dc.SetBrush(*dimColor);
+            devContext.SetPen(*dimColor);
+            devContext.SetBrush(*dimColor);
         }
-        dc.DrawRoundedRectangle(data.rectPos.x + borderThickness, data.rectPos.y + borderThickness, blockBoxSize.x, blockBoxSize.y, 5);
-
+        devContext.DrawRoundedRectangle(data.rectPos.x + borderThickness(), data.rectPos.y + borderThickness(), blockBoxSize.x, blockBoxSize.y, rectangeRadius());
 
         if (param->getType() & BladeStyles::REFMASK) {
-            const auto refNum{(param->getType() & BladeStyles::REFMASK) >> 16};
-            const auto yOffset{(data.rectSize.y - dc.GetCharHeight()) / 2};
-            dc.SetTextForeground(*dimColor);
-            dc.DrawText(params.at(refNum - 1)->name, data.rectPos.x + borderThickness + internalPadding, data.rectPos.y + borderThickness + yOffset);
+            const auto refNum{BladeStyles::getRefFromType(param->getType())};
+            const auto yOffset{(data.rectSize.y - devContext.GetCharHeight()) / 2};
+            devContext.SetTextForeground(*dimColor);
+            devContext.DrawText(params.at(refNum - 1)->name, data.rectPos.x + borderThickness() + internalPadding(), data.rectPos.y + borderThickness() + yOffset);
         }
     }
 }
 
-void StyleBlock::paintEvent(wxPaintEvent& evt) {
-    Block::paintEvent(evt);
-    update(false);
+void StyleBlock::paintEvent(wxPaintEvent&) {
+    wxPaintDC paintDC(this);
+    render(paintDC);
 }
+
+} // namespace PCUI

@@ -20,8 +20,8 @@
  */
 
 #include <wx/panel.h>
-#include <wx/stattext.h>
 #include <wx/spinctrl.h>
+#include <wx/stattext.h>
 
 namespace PCUI {
 
@@ -29,10 +29,10 @@ class NumericDec : wxPanel {
 public:
     NumericDec(
         wxWindow* parent,
-        int32_t id = wxID_ANY,
+        wxWindowID winID = wxID_ANY,
         const wxString& label = wxEmptyString,
         const wxSize& size = wxDefaultSize,
-        int32_t style = wxSP_ARROW_KEYS,
+        int64_t style = wxSP_ARROW_KEYS,
         double min       = 0,
         double max       = 0,
         double initial   = 0,
@@ -42,12 +42,12 @@ public:
 
     void setToolTip(wxToolTip* tip);
 
-    const wxSpinCtrlDouble* entry() const;
-    const wxStaticText* text() const;
+    [[nodiscard]] const wxSpinCtrlDouble* entry() const;
+    [[nodiscard]] const wxStaticText* text() const;
 
 private:
     wxSpinCtrlDouble* mEntry{nullptr};
     wxStaticText* mText{nullptr};
 };
 
-}
+} // namespace PCUI

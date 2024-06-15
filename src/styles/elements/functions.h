@@ -21,8 +21,8 @@
  */
 
 #include "stylepreview/blade.h"
-#include "styles/bladestyle.h"
 #include "proffieconstructs/vector3d.h"
+#include "styles/bladestyle.h"
 
 namespace BladeStyles {
 
@@ -97,4 +97,4 @@ private:
     static const StyleMap map;
 };
 
-}
+} // namespace BladeStyles

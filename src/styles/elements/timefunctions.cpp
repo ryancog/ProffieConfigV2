@@ -60,13 +60,13 @@ public:
             const char* osName, 
             const char* humanName, 
             const std::vector<Param*>& params) :
-        TimeFunctionStyle(osName, humanName, params), base() {}
+        TimeFunctionStyle(osName, humanName, params), pBase() {}
 
-    virtual double bend(uint32_t time, uint32_t length, double scale) override { return base.bend(time, length, scale); }
-    virtual int32_t getInt(int32_t led) override { return base.getInt(led); }
+    double bend(uint32_t time, uint32_t length, double scale) override { return pBase.bend(time, length, scale); }
+    int32_t getInt(int32_t led) override { return pBase.getInt(led); }
 
 protected:
-    T base;
+    T pBase;
 };
 
 #define TIMEFUNCW(osName, humanName, base, params, ...) \
@@ -90,7 +90,7 @@ TIMEFUNC(BendTimePowX, "Exponential Time Bend",
                 }
                 millisStyle->setParam(0, const_cast<BladeStyle*>(timeParam));
             } else {
-                if (millisStyle) delete millisStyle;
+                delete millisStyle;
                 millisStyle = const_cast<TimeFunctionStyle*>(static_cast<const TimeFunctionStyle*>(timeParam));
             }
 
@@ -100,10 +100,10 @@ TIMEFUNC(BendTimePowX, "Exponential Time Bend",
             powerStyle->run(blade);
         }
         BEND(time, length, scale) {
-            return scale * powf(millisStyle->bend(time, length, 1.f), exponent);
+            return scale * powf(millisStyle->bend(time, length, 1.F), exponent);
         }
         GETINT() {
-            exponent = powerStyle->getInt(0) / 32768.f;
+            exponent = powerStyle->getInt(0) / (std::numeric_limits<int16_t>::max() + 1.F);
             return millisStyle->getInt(0);
         }
 
@@ -117,7 +117,7 @@ TIMEFUNC(BendTimePowX, "Exponential Time Bend",
             // Non-null could be problematic on init
             TimeFunctionStyle* millisStyle{nullptr};
             FunctionStyle* powerStyle;
-            float exponent{0.f};
+            float exponent{0.F};
         )
 
 TIMEFUNC(ReverseTimeX, "Reverse Time",
@@ -132,7 +132,7 @@ TIMEFUNC(ReverseTimeX, "Reverse Time",
                 }
                 millisStyle->setParam(0, const_cast<BladeStyle*>(timeParam));
             } else {
-                if (millisStyle) delete millisStyle;
+                delete millisStyle;
                 millisStyle = const_cast<TimeFunctionStyle*>(static_cast<const TimeFunctionStyle*>(timeParam));
             }
 
@@ -155,14 +155,14 @@ TIMEFUNCW(BendTimePowInvX, "Inverse Exponential Time Bend", ReverseTimeX,
             new StyleParam("Power", FUNCTION, FunctionStyle::get("Int")(PARAMVEC(65536)))
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, TimeFunctionStyle::get("BendTimePowX")(PARAMVEC()));
-            auto timeBendStyle{STYLECAST(TimeFunctionStyle, base.getParamStyle(0))};
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, TimeFunctionStyle::get("BendTimePowX")(PARAMVEC()));
+            auto timeBendStyle{STYLECAST(TimeFunctionStyle, pBase.getParamStyle(0))};
 
             if (timeBendStyle->getParamStyle(0)) timeBendStyle->setParam(0, TimeFunctionStyle::get("ReverseTimeX")(PARAMVEC()));
             const_cast<BladeStyle*>(timeBendStyle->getParamStyle(0))->setParam(0, const_cast<BladeStyle*>(getParamStyle(0)));
             timeBendStyle->setParam(1, const_cast<BladeStyle*>(getParamStyle(1)));
             
-            base.run(blade);
+            pBase.run(blade);
         }
         )
 
@@ -172,13 +172,13 @@ TIMEFUNCW(BendTimePow, "Inverse Time Bend", BendTimePowX,
             new NumberParam("Power", 65536)
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
 
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            base.run(blade);
+            pBase.run(blade);
         }
         )
 
@@ -188,13 +188,13 @@ TIMEFUNCW(BendTimePowInv, "Inverse Exponential Time Bend", BendTimePowInvX,
             new NumberParam("Power", 65536)
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
-            if (!base.getParamStyle(1)) base.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(1)) pBase.setParam(1, FunctionStyle::get("Int")(PARAMVEC()));
 
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
-            const_cast<BladeStyle*>(base.getParamStyle(1))->setParam(0, getParamNumber(1));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
+            const_cast<BladeStyle*>(pBase.getParamStyle(1))->setParam(0, getParamNumber(1));
 
-            base.run(blade);
+            pBase.run(blade);
         }
         )
 
@@ -203,11 +203,11 @@ TIMEFUNCW(ReverseTime, "Reverse Time", ReverseTimeX,
             new NumberParam("Millis", 1000)
             ),
         RUN(blade) {
-            if (!base.getParamStyle(0)) base.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
+            if (!pBase.getParamStyle(0)) pBase.setParam(0, FunctionStyle::get("Int")(PARAMVEC()));
 
-            const_cast<BladeStyle*>(base.getParamStyle(0))->setParam(0, getParamNumber(0));
+            const_cast<BladeStyle*>(pBase.getParamStyle(0))->setParam(0, getParamNumber(0));
 
-            base.run(blade);
+            pBase.run(blade);
         }
         )
 

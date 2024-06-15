@@ -20,7 +20,6 @@
  */
 
 #include "styles/elements/effects.h"
-#include <chrono>
 #include <cstdint>
 #include <vector>
 
@@ -42,15 +41,17 @@ public:
 
     // Effects are cleared out 7s (7000000us) after occurring
     // Maximum of 10 effects in "stack" (Make this a deque?)
-    const std::vector<BladeEffect>& getEffects() const;
+    [[nodiscard]] const std::vector<BladeEffect>& getEffects() const;
 
-    bool isOn() const;
+    [[nodiscard]] bool isOn() const;
 
     void doEffect(Effect, int32_t location, int32_t wavNum);
 
-    int32_t batteryLevel{100};
-    int32_t numLeds{144};
+    static constexpr auto PERCENT_100{100};
+    int32_t batteryLevel{PERCENT_100};
+    static constexpr auto WS2811_NUM_LEDS{144};
+    int32_t numLeds{WS2811_NUM_LEDS};
 };
 
-}
+} // namespace BladeStyles::StylePreview
 

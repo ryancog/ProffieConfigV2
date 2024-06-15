@@ -21,10 +21,8 @@
 
 #include <wx/frame.h>
 
-#include "ui/frame.h"
-
 namespace Test {
 
-PCUI::Frame* init();
+void run();
 
-}
+} // namespace Test

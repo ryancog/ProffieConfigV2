@@ -33,6 +33,13 @@ struct Data;
 std::vector<Data*> getPropData(const std::vector<std::string>& pconfs);
 
 struct Data {
+    Data() = default;
+    Data(const Data &) = default;
+    Data(Data &&) = delete;
+    Data &operator=(const Data &) = default;
+    Data &operator=(Data &&) = delete;
+    ~Data();
+
     struct LayoutItem;
     struct LayoutLevel;
 
@@ -40,20 +47,18 @@ struct Data {
     struct ButtonState;
     struct Button;
 
-    std::string name{};
-    std::string filename{};
+    std::string name;
+    std::string filename;
 
-    std::string info{};
+    std::string info;
 
-    Config::Setting::DefineMap* settings{nullptr};
+    Config::Setting::DefineMap *settings{nullptr};
 
-    typedef std::vector<LayoutItem*> LayoutVec;
-    LayoutVec* layout{nullptr};
+    using LayoutVec = std::vector<LayoutItem *>;
+    LayoutVec *layout{nullptr};
 
-    typedef std::unordered_map<uint8_t, ButtonMap*> Buttons;
+    using Buttons = std::unordered_map<uint8_t, ButtonMap *>;
     Buttons buttonControls;
-
-    ~Data();
 };
 
 enum class LayoutType {
@@ -62,30 +67,38 @@ enum class LayoutType {
 };
 
 struct Data::LayoutItem {
-    Config::Setting::DefineBase* setting{nullptr};
-
-    virtual LayoutType getType() const { return LayoutType::ITEM; }
+    LayoutItem() = default;
+    LayoutItem(const LayoutItem &) = default;
+    LayoutItem(LayoutItem &&) = delete;
+    LayoutItem &operator=(const LayoutItem &) = default;
+    LayoutItem &operator=(LayoutItem &&) = delete;
     virtual ~LayoutItem() {
-        if (setting) delete setting;
+        delete setting;
     }
+
+    Config::Setting::DefineBase *setting{nullptr};
+
+    [[nodiscard]] virtual LayoutType getType() const { return LayoutType::ITEM; }
 };
 
 struct Data::LayoutLevel : LayoutItem {
-    std::string label{""};
-    std::vector<LayoutItem*>* items{nullptr};
-
-    enum class Direction {
-        HORIZONTAL,
-        VERTICAL
-    } direction;
-
-    virtual LayoutType getType() const { return LayoutType::LEVEL; }
-    virtual ~LayoutLevel() {
+    LayoutLevel() = default;
+    LayoutLevel(const LayoutLevel &) = default;
+    LayoutLevel(LayoutLevel &&) = delete;
+    LayoutLevel &operator=(const LayoutLevel &) = default;
+    LayoutLevel &operator=(LayoutLevel &&) = delete;
+     ~LayoutLevel() override {
         if (items) {
-            for (auto& item : *items) if (item) delete item;
+            for (auto &item : *items) delete item;
             delete items;
         }
     }
+
+    std::string label;
+    std::vector<LayoutItem *> *items{nullptr};
+    enum class Direction { HORIZONTAL, VERTICAL } direction;
+
+     [[nodiscard]] LayoutType getType() const override { return LayoutType::LEVEL; }
 };
 
 
@@ -95,24 +108,32 @@ struct Data::Button {
 };
 
 struct Data::ButtonState {
-    std::string label;
-    std::vector<Button*> buttons;
-
+    ButtonState() = default;
+    ButtonState(const ButtonState &) = default;
+    ButtonState(ButtonState &&) = delete;
+    ButtonState &operator=(const ButtonState &) = default;
+    ButtonState &operator=(ButtonState &&) = delete;
     virtual ~ButtonState() {
-        for (auto& button : buttons) if (button) delete button;
+        for (auto &button : buttons) delete button;
     }
+
+    std::string label;
+    std::vector<Button *> buttons;
 };
 
 struct Data::ButtonMap {
-    std::unordered_set<ButtonState*> states;
-    int8_t numButton;
-
+    ButtonMap() = default;
+    ButtonMap(const ButtonMap &) = default;
+    ButtonMap(ButtonMap &&) = delete;
+    ButtonMap &operator=(const ButtonMap &) = default;
+    ButtonMap &operator=(ButtonMap &&) = delete;
     virtual ~ButtonMap() {
-        for (auto& state : states)
-            if (state)
-                delete state;
+        for (const auto &state : states) delete state;
     }
+
+    std::unordered_set<ButtonState *> states;
+    int8_t numButton;
 };
 
+} // namespace PropFile
 
-}

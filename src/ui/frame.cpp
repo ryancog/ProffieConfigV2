@@ -25,24 +25,31 @@
 
 using namespace PCUI;
 
+#include <iostream>
+
 Frame::Frame(wxWindow* parent,
-             int32_t id,
+             wxWindowID winID,
              const wxString& title,
              const wxPoint& pos,
              const wxSize& size,
-             int32_t style,
+             int64_t style,
              const wxString& name) {
-    Create(parent, id, title, pos, size, style, name);
-
-#	ifdef __WXMSW__
+#	ifdef __WINDOWS__
+    // gtk_widget_get_window(GetHandle());
+    // auto var{this->GetGetHandle()};
+    // DwmSetWindowAttribute(this->GTKGetDrawingWindow()->);
     SetIcon(wxICON(IDI_ICON1));
 #	endif
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+
+    Create(parent, winID, title, pos, size, style, name);
+    SetDoubleBuffered(true);
 }
 
 Frame::~Frame() {
-    if (reference && *reference) (*reference) = nullptr;
+    if (mReference && *mReference) (*mReference) = nullptr;
 }
 
 void Frame::setReference(Frame** ref) {
-    reference = ref;
+    mReference = ref;
 }

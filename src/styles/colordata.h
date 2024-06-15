@@ -33,7 +33,7 @@ struct ColorData {
     uint32_t red{0};
     uint32_t green{0};
     uint32_t blue{0};
-    uint32_t alpha{32768};
+    uint32_t alpha{std::numeric_limits<int16_t>::max() + 1};
 
     bool operator==(const ColorData& other) const;
     ColorData operator*(uint16_t multiplier) const;
@@ -44,14 +44,11 @@ struct ColorData {
 
 /**
  * Used in ProffieOS to "mix colors" (obviously)
- *
- * Not sure what x is exactly, haven't closely examined the code.
- * Shift is a bitshift value... also not sure the significance of it.
  */
-ColorData mixColors(const ColorData&, const ColorData&, int32_t x, int32_t shift);
+ColorData mixColors(const ColorData&, const ColorData&, int32_t weight, int32_t shift);
 
 // Yes, we're going to play off the english spelling, lol
 wxColour colorToColour(const ColorData&);
 
-}
+} // namespace BladeStyles
 

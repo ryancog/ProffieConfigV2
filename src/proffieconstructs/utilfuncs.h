@@ -2,7 +2,7 @@
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek,
- * based on code from ProffieOS, copyright Fredrik Hubinette et al.
+ * partially based on code from ProffieOS, copyright Fredrik Hubinette et al.
  *
  * proffieconstructs/utilfuncs.h
  *
@@ -21,13 +21,16 @@
  */
 
 #include <cmath>
+#include <cstdint>
 
 namespace ProffieUtils {
 
 // returns decimals/fraction of a number
 // 3.14159 becomes 0.14159
-constexpr inline float fract(float x) {
-    return x - floorf(x);
+constexpr inline float fract(float num) {
+    return num - floorf(num);
 }
 
-}
+uint32_t random();
+
+} // namespace ProffieUtils

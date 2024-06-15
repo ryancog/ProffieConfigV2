@@ -51,10 +51,10 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    LockupTypeStyle(const char* osName, const char* humanName, const LockupType lockType);
+    LockupTypeStyle(const char* osName, const char* humanName, LockupType lockType);
 
 private:
     static const StyleMap map;
 };
 
-}
+} // namespace BladeStyles

@@ -19,11 +19,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
 #include <istream>
 #include <ostream>
 #include <sstream>
 #include <string>
-#include <algorithm>
 
 #include "log/logger.h"
 
@@ -55,7 +55,7 @@ PConf::Entry* PConf::readEntry(std::istream& inStream, bool& isSect) {
     auto name{parseName(line)};
     if (!name) return nullptr;
 
-    auto ret{new Entry};
+    auto *ret{new Entry};
     ret->name = name.value();
     ret->value = parseValue(line, inStream);
     ret->label = parseLabel(line);
@@ -71,28 +71,28 @@ PConf::Section* PConf::readSection(std::istream& inStream) {
     auto name{parseName(line)};
     if (!name) return nullptr;
 
-    auto sect{new Section};
+    auto *sect{new Section};
     sect->name = name.value();
     sect->label = parseLabel(line);
     sect->labelNum = parseLabelNum(line);
 
-    bool foundSect;
+    bool foundSect{false};
     while (inStream.peek() != EOF) {
-        auto entry{readEntry(inStream, foundSect)};
+        auto *entry{readEntry(inStream, foundSect)};
         if (foundSect) {
-            auto subSect{readSection(inStream)};
+            auto *subSect{readSection(inStream)};
             if (!subSect) continue;
             sect->entries.push_back(subSect);
             continue;
         }
         if (!entry) {
             // Check for section end
-            char checkBuf;
+            char checkBuf{'\0'};
             inStream.unget(); // \n
-            do {
+            while ((checkBuf != '\n' && checkBuf != '}') && checkBuf != EOF) {
                 inStream.unget();
-                checkBuf = inStream.peek();
-            } while ((checkBuf != '\n' && checkBuf != '}') && checkBuf != EOF);
+                checkBuf = static_cast<char>(inStream.peek());
+            } 
             inStream.get(); // \n
             getline(inStream, line); // ungot line
 
@@ -108,13 +108,13 @@ PConf::Section* PConf::readSection(std::istream& inStream) {
 std::unordered_set<std::string> PConf::setFromValue(const std::optional<std::string>& value) {
     std::unordered_set<std::string> ret;
     size_t startPos{0};
-    size_t endPos;
+    size_t endPos{0};
     const std::string& val{value.value_or("")};
-    do {
+    while (endPos != std::string::npos) {
         endPos = val.find('\n', startPos);
         ret.emplace(val.substr(startPos, endPos));
         startPos = endPos + 1;
-    } while (endPos != std::string::npos);
+    } 
 
     return ret;
 }
@@ -141,7 +141,8 @@ static std::optional<std::string> parseValue(const std::string& line, std::istre
     auto bracePos{line.find('{')};
     auto isMultiline{bracePos != std::string::npos && seperatorPos < bracePos};
     if (isMultiline) return parseMultilineValue(inStream);
-    else return parseSinglelineValue(line.substr(seperatorPos + 1));
+
+    return parseSinglelineValue(line.substr(seperatorPos + 1));
 }
 
 static std::optional<std::string> parseSinglelineValue(const std::string& lineEnd) {
@@ -150,11 +151,11 @@ static std::optional<std::string> parseSinglelineValue(const std::string& lineEn
     bool usesQuotes{lineEnd.find('"') != std::string::npos};
     bool record{false};
 
-    char buf;
+    char buf{'\0'};
     std::string ret;
 
     while (!false) {
-        buf = lineStream.get();
+        buf = static_cast<char>(lineStream.get());
         if (buf == EOF) {
             if (usesQuotes && record) {
                 Logger::warn("Entry value w/ quotes not terminated before EOL! (" + lineEnd + ")", false);
@@ -166,7 +167,7 @@ static std::optional<std::string> parseSinglelineValue(const std::string& lineEn
         if (usesQuotes) {
             if (buf == '"') {
                 record = !record;
-                if (record == true && !ret.empty()) ret += '\n';
+                if (record && !ret.empty()) ret += '\n';
                 continue;
             }
         } else {
@@ -174,8 +175,7 @@ static std::optional<std::string> parseSinglelineValue(const std::string& lineEn
                 ret += '\n';
                 continue;
             }
-            if (buf == ' ' || buf == '\t') record = false;
-            else record = true;
+            record = buf != ' ' && buf != '\t';
         }
 
         if (record) ret += buf;
@@ -206,21 +206,21 @@ static std::optional<std::string> parseLabel(const std::string& line) {
     bool inParens{false};
     bool inQuotes{false};
 
-    for (char c : line) {
-        if (c == ':') return std::nullopt;
-        if (c == '"' && !inParens) return std::nullopt;
+    for (char character : line) {
+        if (character == ':') return std::nullopt;
+        if (character == '"' && !inParens) return std::nullopt;
 
-        if (c == '(') {
+        if (character == '(') {
             inParens = true;
             continue;
         }
-        if (c == '"' && inParens) {
+        if (character == '"' && inParens) {
             if (inQuotes) return label;
             inQuotes = true;
             continue;
         }
 
-        if (inQuotes) label += c;
+        if (inQuotes) label += character;
     }
 
     return std::nullopt;
@@ -240,7 +240,7 @@ static std::optional<int32_t> parseLabelNum(const std::string& line) {
         return std::nullopt;
     }
 
-    auto numBeginIt{std::find_if(line.begin() + openBracePos, line.end(), [](char c) { return std::isdigit(c); })};
+    auto numBeginIt{std::find_if(std::next(line.begin(), static_cast<int32_t>(openBracePos)), line.end(), [](char character) { return std::isdigit(character); })};
     if (numBeginIt == line.end()) {
         Logger::warn("Entry has empty/malformed numeric label! (" + line + ")", false);
         return std::nullopt;
@@ -255,7 +255,7 @@ static std::ostream& writeWithDepth(std::ostream& outStream, int32_t depth) {
     return outStream;
 }
 
-void PConf::writeEntry(std::ostream& outStream, const Entry& entry, const int32_t depth) {
+void PConf::writeEntry(std::ostream& outStream, const Entry& entry, int32_t depth) {
     writeWithDepth(outStream, depth) << entry.name;
     if (entry.label) outStream << "(\"" << entry.label.value() << "\")";
     if (entry.labelNum) outStream << '{' << entry.labelNum.value() << '}';
@@ -268,8 +268,8 @@ void PConf::writeEntry(std::ostream& outStream, const Entry& entry, const int32_
     const auto& valueStr{entry.value.value()};
     outStream << ": ";
 
-    auto lineBegin{0};
-    auto lineEnd{valueStr.find('\n')};
+    size_t lineBegin{0};
+    size_t lineEnd{valueStr.find('\n')};
     if (lineEnd != std::string::npos) {
         outStream << '{' << std::endl;
         writeWithDepth(outStream, depth + 1);
@@ -286,7 +286,7 @@ void PConf::writeEntry(std::ostream& outStream, const Entry& entry, const int32_
     if (lineBegin != 0) writeWithDepth(outStream, depth) << '}' << std::endl;
 }
 
-void PConf::writeSection(std::ostream& outStream, const Section& section, const int32_t depth) {
+void PConf::writeSection(std::ostream& outStream, const Section& section, int32_t depth) {
     writeWithDepth(outStream, depth) << section.name;
     if (section.label) outStream << "(\"" << section.label.value() << "\")";
     if (section.labelNum) outStream << '{' << section.labelNum.value() << '}';

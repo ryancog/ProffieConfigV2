@@ -19,26 +19,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "wx/event.h"
+#include <wx/checkbox.h>
 #include <wx/panel.h>
 #include <wx/stattext.h>
-#include <wx/checkbox.h>
 
 namespace PCUI {
 
 class Toggle : wxPanel {
 public:
     Toggle(
-        wxWindow* parent,
-        int32_t id = wxID_ANY,
-        const wxString& label = wxEmptyString,
-        const wxSize& size = wxDefaultSize,
-        int32_t style = 0,
-        const wxOrientation& orient = wxVERTICAL
+        wxWindow *parent,
+        wxWindowID = wxID_ANY,
+        const wxString &label = wxEmptyString,
+        const wxSize &size = wxDefaultSize,
+        int64_t style = 0,
+        wxOrientation orient = wxVERTICAL
         );
 
     void setToolTip(wxToolTip* tip);
 
-    const wxCheckBox* entry() const;
+    [[nodiscard]] const wxCheckBox* entry() const;
     // const wxStaticText* text() const;
 
 private:
@@ -46,4 +47,4 @@ private:
     wxStaticText* mText{nullptr};
 };
 
-}
+} // namespace PCUI

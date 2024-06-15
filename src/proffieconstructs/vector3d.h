@@ -2,7 +2,7 @@
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek,
- * based on code from ProffieOS, copyright Fredrik Hubinette et al.
+ * partially based on code from ProffieOS, copyright Fredrik Hubinette et al.
  *
  * proffieconstructs/vector3d.h
  *
@@ -27,26 +27,26 @@ public:
     Vector3D(float, float, float);
 
     Vector3D operator+(const Vector3D&) const;
-    Vector3D operator+(const float) const;
+    Vector3D operator+(float) const;
     Vector3D operator-(const Vector3D&) const;
-    Vector3D operator-(const float) const;
+    Vector3D operator-(float) const;
     Vector3D operator-() const;
     Vector3D operator*(const Vector3D&) const;
-    Vector3D operator*(const float) const;
+    Vector3D operator*(float) const;
     Vector3D operator/(const Vector3D&) const;
-    Vector3D operator/(const float) const;
+    Vector3D operator/(float) const;
 
     Vector3D operator+=(const Vector3D&);
     Vector3D operator-=(const Vector3D&);
     Vector3D operator*=(const Vector3D&);
     Vector3D operator/=(const Vector3D&);
 
-    float dot(const Vector3D&);
-    Vector3D cross(const Vector3D&);
+    [[nodiscard]] float dot(const Vector3D&) const;
+    [[nodiscard]] Vector3D cross(const Vector3D &operand) const;
 
     // Length squared
-    float length2() const;
-    float length() const;
+    [[nodiscard]] float length2() const;
+    [[nodiscard]] float length() const;
 
     static void rotate90(float&, float&);
     static void rotate180(float&, float&);
@@ -60,12 +60,12 @@ public:
     void rotateY180();
     void rotateZ180();
 
-    Vector3D rotateX(float) const;
-    Vector3D rotateY(float) const;
-    Vector3D rotateZ(float) const;
-    Vector3D rotate(float) const;
+    [[nodiscard]] Vector3D rotateX(float) const;
+    [[nodiscard]] Vector3D rotateY(float) const;
+    [[nodiscard]] Vector3D rotateZ(float) const;
+    [[nodiscard]] Vector3D rotate(float) const;
 
-    Vector3D moveTowardsZero(float) const;
+    [[nodiscard]] Vector3D moveTowardsZero(float) const;
 
     float x;
     float y;

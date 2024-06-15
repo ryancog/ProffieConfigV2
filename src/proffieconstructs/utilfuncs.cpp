@@ -1,9 +1,9 @@
-#pragma once
+#include "utilfuncs.h"
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek
  *
- * ui/text.cpp
+ * proffieconstructs/utilfuncs.cpp
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,31 +19,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <wx/panel.h>
-#include <wx/radiobut.h>
-#include <wx/stattext.h>
+#include <cstdint>
+#include <random>
 
-namespace PCUI {
+namespace ProffieUtils {
 
-class Selection : wxPanel {
-public:
-    Selection(
-        wxWindow *parent,
-        wxWindowID winID = wxID_ANY,
-        const wxString &label = wxEmptyString,
-        const wxSize &size = wxDefaultSize,
-        int64_t style = 0,
-        wxOrientation orient = wxVERTICAL
-        );
+uint32_t random() {
+    static std::minstd_rand generator;
+    static std::uniform_int_distribution<uint32_t> distribution;
+    return distribution(generator);
+}
 
-    void setToolTip(wxToolTip *tip);
-
-    [[nodiscard]] const wxRadioButton *entry() const;
-    // const wxStaticText* text() const;
-
-private:
-    wxRadioButton *mEntry{nullptr};
-    wxStaticText *mText{nullptr};
-};
-
-} // namespace PCUI
+} // namespace ProffieUtils

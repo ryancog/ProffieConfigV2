@@ -27,19 +27,19 @@ namespace PCUI {
 class Frame : public wxFrame {
 public:
     Frame(wxWindow* parent,
-          int32_t id,
+          int32_t winID,
           const wxString& title,
           const wxPoint& pos = wxDefaultPosition,
           const wxSize& size = wxDefaultSize,
-          int32_t style = wxDEFAULT_FRAME_STYLE,
+          int64_t style = wxDEFAULT_FRAME_STYLE,
           const wxString& name = "Frame");
-    ~Frame();
+    ~Frame() override;
 
     void setReference(Frame**);
 
 private:
-    Frame** reference{nullptr};
+    Frame** mReference{nullptr};
 
 };
 
-}
+} // namespace PCUI

@@ -19,26 +19,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <wx/tooltip.h>
 #include <wx/sizer.h>
+#include <wx/tooltip.h>
 
 using namespace PCUI;
 
+using NumBits = int8_t;
+using ControlValue = int32_t;
+
 BitsCtrl::BitsCtrl(
         wxWindow* parent,
-        int32_t id,
-        int8_t numBits,
-        int32_t initialValue,
+        wxWindowID winID,
+        NumBits numBits,
+        ControlValue initialValue,
         const wxString& label,
         const wxSize& size,
-        int32_t style,
+        int64_t style,
         const wxOrientation& orient) :
-    wxPanel(parent, id, wxDefaultPosition, size), numBits(numBits) {
-    auto sizer{new wxBoxSizer(orient)};
+    wxPanel(parent, winID, wxDefaultPosition, size), mNumBits(numBits) {
+    auto *sizer{new wxBoxSizer(orient)};
 
     if (!label.empty()) {
         mText = new wxStaticText(this, wxID_ANY, label);
-        auto sizerFlags{wxSizerFlags(0).Border(wxLEFT | wxRIGHT, 5)};
+        auto sizerFlags{wxSizerFlags(0).Border(wxLEFT | wxRIGHT, 5)}; // NOLINT(readability-magic-numbers)
         sizer->Add(mText, orient == wxHORIZONTAL ? sizerFlags.Center() : sizerFlags);
     }
 
@@ -56,7 +59,7 @@ BitsCtrl::BitsCtrl(
 
 void BitsCtrl::setValue(int32_t value) {
     wxString str;
-    for (auto i{0}; i < numBits; i++) {
+    for (auto i{0}; i < mNumBits; i++) {
         str += (value & (1 << i)) ? '1' : '0';
     }
     mEntry->SetValue(str);
@@ -65,14 +68,14 @@ void BitsCtrl::setValue(int32_t value) {
 int32_t BitsCtrl::getValue() const {
     int32_t ret{0};
     auto strVal{mEntry->GetValue()};
-    for (auto i{0}; i < numBits; i++) {
+    for (auto i{0}; i < mNumBits; i++) {
         if (strVal.at(i) == '1') ret |= (1 << i);
     }
     return ret;
 }
 
 void BitsCtrl::setToolTip(wxToolTip* tip) {
-    SetToolTip(tip);
+    SetToolTip(tip->GetTip());
     mEntry->SetToolTip(new wxToolTip(tip->GetTip()));
     if (mText) mText->SetToolTip(new wxToolTip(tip->GetTip()));
 }

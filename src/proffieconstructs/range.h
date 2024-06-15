@@ -2,7 +2,7 @@
 /*
  * ProffieConfig, All-In-One Proffieboard Management Utility
  * Copyright (C) 2024 Ryan Ogurek,
- * based on code from ProffieOS, copyright Fredrik Hubinette et al.
+ * partially based on code from ProffieOS, copyright Fredrik Hubinette et al.
  *
  * proffieconstructs/range.h
  *
@@ -24,10 +24,10 @@
 
 class Range {
 public:
-    Range();
+    Range() = default;
     Range(uint32_t start, uint32_t end);
 
-    uint32_t size() const;
+    [[nodiscard]] uint32_t size() const;
     Range operator&(const Range& other) const;
 
     uint32_t start{0};

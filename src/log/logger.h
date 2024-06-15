@@ -19,19 +19,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <cstdint>
 #include <string>
-#include <stdint.h>
 
 namespace Logger {
 
-enum LogLevel : uint32_t {
-    ERROR = 1,
+enum LogLevel : uint8_t {
+    ERR = 1,
     WARN,
     INFO,
     DEBUG,
     VERBOSE,
 
-    ALL = ERROR | WARN | INFO | DEBUG | VERBOSE
+    ALL = ERR | WARN | INFO | DEBUG | VERBOSE
 };
 
 void init();
@@ -39,12 +39,12 @@ void init();
 void addLogOut(std::ostream&, LogLevel);
 void removeLogOut(std::ostream&);
 
-void log(LogLevel level, const std::string& message, const bool notify);
+void log(LogLevel level, const std::string& message, bool notify);
 
-void error  (const std::string& message, const bool notify = true);
-void warn   (const std::string& message, const bool notify = true);
-void info   (const std::string& message, const bool notify = false);
-void debug  (const std::string& message, const bool notify = false);
-void verbose(const std::string& message, const bool notify = false);
+void error  (const std::string& message, bool notify = true);
+void warn   (const std::string& message, bool notify = true);
+void info   (const std::string& message, bool notify = false);
+void debug  (const std::string& message, bool notify = false);
+void verbose(const std::string& message, bool notify = false);
 
-}
+} // namespace Logger

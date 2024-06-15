@@ -23,9 +23,9 @@
 
 #include <wx/event.h>
 #include <wx/frame.h>
+#include <wx/gdicmn.h>
 #include <wx/panel.h>
 #include <wx/scrolwin.h>
-#include <wx/gdicmn.h>
 #include <wx/timer.h>
 
 namespace PCUI {
@@ -37,23 +37,25 @@ class Movable;
 
 class MoveArea : public wxPanel {
 public:
-    MoveArea(wxWindow* parent,
-              int32_t id,
-              const wxPoint& pos = wxDefaultPosition,
-              const wxSize& size = wxDefaultSize,
-              int32_t style = wxTAB_TRAVERSAL);
+    MoveArea(
+            wxWindow* parent,
+            wxWindowID winID,
+            const wxPoint& pos = wxDefaultPosition,
+            const wxSize& size = wxDefaultSize,
+            int64_t style = wxTAB_TRAVERSAL
+            );
 
-    Movable* getDragWindow() const { return dragWindow; }
+    Movable* getDragWindow() const { return mDragWindow; }
 
     /**
      * @brief AdoptionRoutine functions take in a movable
      * as well as it's screen position, test to see if they
      * want to adopt the movable, and return true if so, false otherwise.
     */
-    typedef std::function<bool(Movable*, wxPoint)> AdoptionRoutine;
+    using AdoptionRoutine = std::function<bool (Movable *, wxPoint)>;
 
-    void addAdoptRoutine(wxWindow* moveWin, AdoptionRoutine routine);
-    void removeAdoptRoutine(wxWindow* moveWin);
+    void addAdoptRoutine(wxWindow* window, AdoptionRoutine routine);
+    void removeAdoptRoutine(wxWindow* window);
 
 protected:
     friend class Movable;
@@ -63,43 +65,47 @@ protected:
     void removeChildFromStack(Movable*);
 
 private:
-    wxPanel* dragArea{nullptr};
-    Movable* dragWindow{nullptr};
-    std::unordered_map<wxWindow*, AdoptionRoutine> adoptionRoutines;
-    std::vector<Movable*> childStack;
+    wxPanel* mDragArea{nullptr};
+    Movable* mDragWindow{nullptr};
+    std::unordered_map<wxWindow*, AdoptionRoutine> mAdoptionRoutines;
+    std::vector<Movable*> mChildStack;
 
    wxPoint calcDelta(const wxPoint* mousePos);
+   struct CalcData {
+       wxPoint lastPos;
+       bool reset{false};
+   } mCalcData;
 };
 
 class MovePanel : public wxPanel {
 public:
-    MovePanel();
+    MovePanel() = default;
     MovePanel(
             wxWindow* parent,
             MoveArea* moveArea,
-            int32_t id,
+            wxWindowID winID,
             const wxPoint& pos = wxDefaultPosition,
             const wxSize& size = wxDefaultSize,
-            int32_t style = wxTAB_TRAVERSAL,
+            int64_t style = wxTAB_TRAVERSAL,
             const wxString& objName = "MovePanel");
-    ~MovePanel();
+    ~MovePanel() override;
 
     void create(
             wxWindow* parent, 
             MoveArea* moveArea, 
-            int32_t id, 
+            wxWindowID winID, 
             const wxPoint& pos,
             const wxSize& size,
-            int32_t style = wxTAB_TRAVERSAL,
+            int64_t style = wxTAB_TRAVERSAL,
             const wxString& objName = "MovePanel");
 
-    virtual bool hitTest(wxPoint) const;
+    [[nodiscard]] virtual bool hitTest(wxPoint) const;
 
 protected:
     friend class MoveArea;
     friend class Movable;
 
-    MoveArea* moveArea;
+    MoveArea* pMoveArea;
 };
 
 /**
@@ -113,16 +119,16 @@ public:
     ScrolledMovePanel(
             wxWindow* parent,
             MoveArea* moveArea,
-            int32_t id,
+            wxWindowID winID,
             const wxPoint& pos = wxDefaultPosition,
             const wxSize& size = wxDefaultSize,
-            int32_t style = wxTAB_TRAVERSAL,
-            int32_t scrollStyle = wxScrolledWindowStyle,
+            int64_t style = wxTAB_TRAVERSAL,
+            int64_t scrollStyle = wxScrolledWindowStyle,
             const wxString& objName = "Scrollable Move Panel");
-    ~ScrolledMovePanel();
+    ~ScrolledMovePanel() override;
 
     wxScrolledCanvas* getCanvas();
-    virtual bool hitTest(wxPoint) const override;
+    bool hitTest(wxPoint) const override;
     void scroll(const wxSize& deltaAmt);
     
 protected:
@@ -132,7 +138,7 @@ protected:
     void restoreRoutine(Movable*);
     void suppressRoutine(Movable*, MoveArea::AdoptionRoutine = nullptr);
 
-    enum {
+    enum : int8_t {
         UP          = 0b00000001,
         DOWN        = 0b00000010,
         LEFT        = 0b00000100,
@@ -140,27 +146,27 @@ protected:
         REPOS_VERT  = 0b00010000,
         REPOS_HORIZ = 0b00100000,
     };
-    enum {
+    enum : int8_t {
         TIMER_DRAG
     };
 
-    int32_t jogDistance{20};
+    int32_t pJogDistance{20}; // NOLINT(readability-magic-numbers)
 
-    bool dragging{false};
-    wxPoint lastDragPos;
-    std::unordered_map<Movable*, MoveArea::AdoptionRoutine> suppressedRoutines;
+    bool pDragging{false};
+    wxPoint pLastDragPos;
+    std::unordered_map<Movable*, MoveArea::AdoptionRoutine> pSuppressedRoutines;
 
-    wxScrolledCanvas* canvas{nullptr};
-    wxTimer* timer{nullptr};
+    wxScrolledCanvas* pCanvas{nullptr};
+    wxTimer* pTimer{nullptr};
 };
 
 
 class Movable : public virtual wxWindow {
 public:
     Movable(MoveArea* moveParent);
-    ~Movable();
+    ~Movable() override;
 
-    virtual bool hitTest(wxPoint) const;
+    [[nodiscard]] virtual bool hitTest(wxPoint) const;
     virtual void doOnGrab();
     void doGrab(wxMouseEvent& evt);
     MoveArea* getMoveArea();
@@ -170,9 +176,9 @@ protected:
     friend class MoveArea;
     friend class ScrolledMovePanel;
 
-    MoveArea::AdoptionRoutine routine{nullptr};
-    MoveArea* const moveArea{nullptr};
+    MoveArea::AdoptionRoutine pRoutine{nullptr};
+    MoveArea* const pMoveArea{nullptr};
 };
 
-}
+} // namespace PCUI
 

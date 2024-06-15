@@ -22,7 +22,7 @@
 
 #include "styles/bladestyle.h"
 #include "stylepreview/blade.h"
-#include "styles/elements/colorstyles.h"
+#include "styles/colordata.h"
 
 namespace BladeStyles {
 
@@ -92,9 +92,9 @@ public:
     // The familiar functions are the same as always
     virtual void run(StylePreview::Blade&) = 0;
     virtual void begin() = 0;
-    virtual bool isDone() const = 0;
-    virtual bool shouldRestart() const = 0;
-    virtual uint32_t getStartMillis() const = 0;
+    [[nodiscard]] virtual bool isDone() const = 0;
+    [[nodiscard]] virtual bool shouldRestart() const = 0;
+    [[nodiscard]] virtual uint32_t getStartMillis() const = 0;
     virtual ColorData getColor(const ColorData&, const ColorData&, int32_t) = 0;
 
     static StyleGenerator get(const std::string& styleName);
@@ -108,4 +108,4 @@ private:
 
 };
 
-}
+} // namespace BladeStyles

@@ -80,10 +80,10 @@ public:
     static const StyleMap& getMap();
 
 protected:
-    ArgumentStyle(const char* osName, const char* humanName, const Argument arg);
+    ArgumentStyle(const char* osName, const char* humanName, Argument arg);
 
 private:
     static const StyleMap map;
 };
 
-}
+} // namespace BladeStyles

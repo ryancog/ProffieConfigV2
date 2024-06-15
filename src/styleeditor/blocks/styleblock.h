@@ -21,20 +21,19 @@
 
 #include <optional>
 
-#include <wx/window.h>
-#include <wx/graphics.h>
-#include <wx/event.h>
 #include <wx/button.h>
+#include <wx/event.h>
+#include <wx/graphics.h>
+#include <wx/window.h>
 
 #include "styles/bladestyle.h"
-#include "styleeditor/blocks/block.h"
 #include "ui/movable.h"
 
 namespace PCUI {
 
 wxDECLARE_EVENT(SB_COLLAPSED, wxCommandEvent);
 
-class StyleBlock : public Block, public Movable {
+class StyleBlock : public Movable {
 public:
     /**
      * Creating a StyleBlock w/ a style will bind the style to
@@ -44,17 +43,22 @@ public:
      * Additionally, if the style has children parameters, they will be
      * recursively bound to child blocks of the newly-created block.
      */
-    StyleBlock(MoveArea*, wxWindow*, BladeStyles::BladeStyle*);
-    ~StyleBlock();
+    StyleBlock(MoveArea *, wxWindow *, BladeStyles::BladeStyle *);
+    StyleBlock(const StyleBlock &) = delete;
+    StyleBlock(StyleBlock &&) = delete;
+    StyleBlock &operator=(const StyleBlock &) = delete;
+    StyleBlock &operator=(StyleBlock &&) = delete;
+    ~StyleBlock() override;
 
-    const BladeStyles::BladeStyle* getStyle() const;
-    std::optional<std::string> getString() const;
+    [[nodiscard]] const BladeStyles::BladeStyle *getStyle() const;
+    [[nodiscard]] std::optional<std::string> getString() const;
 
     void update(bool repaint = true);
     void recurseUpdate(bool repaint = true);
 
     void collapse(bool = true);
-    bool isCollapsed() const;
+    [[nodiscard]] bool isCollapsed() const;
+    void setScale(float);
 
     /**
      * Takes in a point relative to the block.
@@ -62,10 +66,33 @@ public:
      * Returns true if the point is on the block and isn't covered
      * by a parameter block, false otherwise.
      */
-    virtual bool hitTest(wxPoint) const override;
+    [[nodiscard]] bool hitTest(wxPoint) const override;
+
+    const uint32_t type;
+    [[nodiscard]] wxSize DoGetBestClientSize() const override { return mSize; }
+
+    static const wxColour* textColor;
+    static const wxColour* faceColor;
+    static const wxColour* bgColor;
+    static const wxColour* dimColor;
+    static const wxColour* hlColor;
+
+    static const wxColour* builtinColor;
+    static const wxColour* function3DColor;
+    static const wxColour* timeFuncColor;
+    static const wxColour* wrapperColor;
+    static const wxColour* transitionColor;
+    static const wxColour* functionColor;
+    static const wxColour* layerColor;
+    static const wxColour* colorColor;
+    static const wxColour* colorLayerColor;
+    static const wxColour* effectColor;
+    static const wxColour* lockupTypeColor;
+    static const wxColour* argumentColor;
+
 
 protected:
-    virtual void doOnGrab() override;
+    void doOnGrab() override;
 
     /**
      * Takes in a Movable and a point which is the 
@@ -73,28 +100,30 @@ protected:
      * screen.
      */
     bool tryAdopt(Movable*, wxPoint);
-    BladeStyles::BladeStyle* const style;
+    BladeStyles::BladeStyle* const pStyle;
     static std::unordered_map<const BladeStyles::BladeStyle*, StyleBlock*> blockMap;
 
 private:
-    enum {
+    enum : int8_t {
         HELP,
         COLLAPSE,
         COPY,
         CUT,
     };
 
+    static void initStatic();
     void initHelp();
     void bindEvents();
     void bindChildren();
 
-    virtual void paintEvent(wxPaintEvent&) override;
-    virtual void render(wxDC&) override;
+    void paintEvent(wxPaintEvent&);
+    void render(wxDC&);
     void calc();
     void updateElementPos();
 
     void showPopMenu(wxMouseEvent&);
 
+    wxSize mSize{0, 0};
 
     struct ParamData {
         std::vector<const wxColour*> colors;
@@ -104,19 +133,37 @@ private:
         
         wxWindow* control{nullptr};
     };
-    std::vector<ParamData> paramsData;
+public: std::vector<ParamData> mParamsData;
+
+    double mScale{1.F};
+    template<typename T>
+    void scaleValue(T& input) const { input = input * mScale; }
+    template<typename T>
+    void inverseScale(T& input) const { input = input / mScale; }
+
+    template<typename T>
+    [[nodiscard]] T getScaled(T input) const { return input * mScale; }
+    template<typename T>
+    [[nodiscard]] T getInverseScale(T input) const { return input / mScale; }
+
+    // NOLINTBEGIN(readability-magic-numbers)
+    [[nodiscard]] float rectangeRadius() const { return getScaled(5.F); }
+    [[nodiscard]] int32_t edgePadding() const { return getScaled(10); }
+    [[nodiscard]] int32_t borderThickness() const { return getScaled(4); }
+    [[nodiscard]] int32_t internalPadding() const { return getScaled(5); }
+    // NOLINTEND(readability-magic-numbers)
 
 
-    wxString name;
+    wxString mName;
 
-    const wxColour* color;
-    wxPoint headerTextPos;
-    wxPoint headerBarPos;
-    wxSize rectSize;
-    wxPoint helpPos;
-    wxButton* helpButton;
+    const wxColour* mColor;
+    wxPoint mHeaderTextPos;
+    wxPoint mHeaderBarPos;
+    wxSize mRectSize;
+    wxPoint mHelpPos;
+    wxButton* mHelpButton;
 
-    bool collapsed{false};
+    bool mCollapsed{false};
 };
 
-}
+} // namespace PCUI

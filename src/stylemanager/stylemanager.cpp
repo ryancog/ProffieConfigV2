@@ -21,11 +21,11 @@
 
 #include <fstream>
 
+#include "appcore/interfaces.h"
 #include "log/logger.h"
 #include "pconf/pconf.h"
 #include "styles/parse.h"
 #include "ui/frame.h"
-#include "appcore/interfaces.h"
 
 #define STYLE_FILENAME "styles.pconf"
 
@@ -50,9 +50,9 @@ StyleManager::StyleMap* StyleManager::loadStyles() {
         return nullptr;
     }
 
-    auto styles{new StyleMap};
+    auto *styles{new StyleMap};
 
-    PConf::Section* section;
+    PConf::Section* section{nullptr};
     while (!styleFile.eof()) {
         section = PConf::readSection(styleFile);
         if (!section) continue;
@@ -75,7 +75,7 @@ StyleManager::StyleMap* StyleManager::loadStyles() {
             continue;
         }
 
-        auto style{BladeStyles::parseString(*styleStr)};
+        auto *style{BladeStyles::parseString(*styleStr)};
         if (!style) {
             Logger::warn("Error parsing style for preset \"" + section->name + "\"");
             continue;
@@ -101,10 +101,10 @@ void StyleManager::saveStyles(const StyleManager::StyleMap& styles) {
     }
 
     for (const auto& [ styleName, style ] : styles) {
-        auto section{new PConf::Section};
+        auto *section{new PConf::Section};
         section->name = "STYLEPRESET";
         section->label = style.name;
-        auto styleEntry{new PConf::Entry};
+        auto *styleEntry{new PConf::Entry};
         styleEntry->name = "STYLE";
         styleEntry->value = BladeStyles::asString(*style.style);
         section->entries.push_back(styleEntry);

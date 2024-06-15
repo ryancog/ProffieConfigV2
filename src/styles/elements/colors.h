@@ -20,8 +20,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string>
 #include <cstdint>
+#include <string>
 
 #include <wx/colour.h>
 
@@ -32,8 +32,8 @@ namespace BladeStyles {
 class FixedColorStyle : ColorStyle {
 public:
 
-    virtual void run(StylePreview::Blade&) override;
-    virtual ColorData getColor(int32_t led) override;
+    void run(StylePreview::Blade&) override;
+    ColorData getColor(int32_t led) override;
 
     static StyleGenerator get(const std::string& styleName);
     static const StyleMap& getMap();
@@ -43,8 +43,8 @@ protected:
 
 private:
     static const StyleMap map;
-    const ColorData color;
+    const ColorData mColor;
 
 };
 
-}
+} // namespace BladeStyles

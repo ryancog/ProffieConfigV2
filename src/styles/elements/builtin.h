@@ -39,4 +39,4 @@ private:
 };
 
 
-}
+} // namespace BladeStyles

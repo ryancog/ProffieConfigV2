@@ -28,17 +28,16 @@
 namespace StyleManager {
 
 struct Preset {
-    std::string name;
-    BladeStyles::BladeStyle* style{nullptr};
+  ~Preset() { delete style; }
 
-    ~Preset() {
-        if (style) delete style;
-    }
+  std::string name;
+  BladeStyles::BladeStyle *style{nullptr};
 };
-typedef std::unordered_map<std::string, Preset> StyleMap;
 
-void launch(wxWindow* parent);
-void saveStyles(const StyleMap&);
-StyleMap* loadStyles();
+using StyleMap = std::unordered_map<std::string, Preset>;
 
-}
+void launch(wxWindow *parent);
+void saveStyles(const StyleMap &);
+StyleMap *loadStyles();
+
+} // namespace StyleManager

@@ -34,7 +34,7 @@ StyleGenerator LayerStyle::get(const std::string& styleName) {
 }
 
 // TODO
-StyleType LayerStyle::getType() const { return type; }
+StyleType LayerStyle::getType() const { return pType; }
 
 const StyleMap& LayerStyle::getMap() { return map; }
 

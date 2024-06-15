@@ -20,8 +20,8 @@
  */
 
 #include <wx/panel.h>
-#include <wx/stattext.h>
 #include <wx/spinctrl.h>
+#include <wx/stattext.h>
 
 namespace PCUI {
 
@@ -29,12 +29,12 @@ class Numeric : public wxPanel {
 public:
     Numeric(
         wxWindow* parent,
-        int32_t id = wxID_ANY,
+        wxWindowID winID = wxID_ANY,
         const wxString& label = wxEmptyString,
         const wxSize& size = wxDefaultSize,
-        int32_t style = wxSP_ARROW_KEYS,
+        int64_t style = wxSP_ARROW_KEYS,
         int32_t min       = 0,
-        int32_t max       = 100,
+        int32_t max       = 100, // NOLINT(readability-magic-numbers)
         int32_t initial   = 0,
         int32_t increment = 1,
         const wxOrientation& orient = wxVERTICAL
@@ -44,12 +44,12 @@ public:
 
     wxSpinCtrl* entry();
     wxStaticText* text();
-    const wxSpinCtrl* entry() const;
-    const wxStaticText* text() const;
+    [[nodiscard]] const wxSpinCtrl* entry() const;
+    [[nodiscard]] const wxStaticText* text() const;
 
 private:
     wxSpinCtrl* mEntry{nullptr};
     wxStaticText* mText{nullptr};
 };
 
-}
+} // namespace PCUI

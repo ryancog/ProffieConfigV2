@@ -20,18 +20,21 @@
  */
 
 #include <cstdint>
+#include <map>
+#include <string>
 #include <variant>
 #include <vector>
-#include <string>
-#include <map>
 
 namespace BladeStyles {
 
-typedef uint32_t StyleType;
+constexpr auto FLAG_OFFSET{16};
+constexpr auto REF_OFFSET{28};
+constexpr auto REF_FIELD{0b1111U};
+using StyleType = uint32_t;
 enum : StyleType {
     // Flags
-    VARIADIC	= 0b1000000000000000U << 16,
-    FIXEDCOLOR	= 0b0100000000000000U << 16,
+    VARIADIC	= 0b100000000000 << FLAG_OFFSET,
+    FIXEDCOLOR	= 0b010000000000 << FLAG_OFFSET,
 
     // Types
     NUMBER      = 0b0000000000000001,
@@ -51,16 +54,16 @@ enum : StyleType {
     ARGUMENT    = 0b0010000000000000,
 
     // Refs
-    REFARG_1	= 1U << 28,
-    REFARG_2	= 2U << 28,
-    REFARG_3	= 3U << 28,
-    REFARG_4	= 4U << 28,
-    REFARG_5	= 5U << 28,
-    REFARG_6	= 6U << 28,
-    REFARG_7	= 7U << 28,
-    REFARG_8	= 8U << 28,
+    REFARG_1	= 1U << REF_OFFSET,
+    REFARG_2	= 2U << REF_OFFSET,
+    REFARG_3	= 3U << REF_OFFSET,
+    REFARG_4	= 4U << REF_OFFSET,
+    REFARG_5	= 5U << REF_OFFSET,
+    REFARG_6	= 6U << REF_OFFSET,
+    REFARG_7	= 7U << REF_OFFSET,
+    REFARG_8	= 8U << REF_OFFSET,
     // Could go up to 15, but I don't feel like putting all those here right now
-    REFMASK		= 0b1111U << 28,
+    REFMASK		= REF_FIELD << REF_OFFSET,
 
     // Masks & Stuff
     FLAGMASK	= ~(VARIADIC | FIXEDCOLOR | REFMASK),
@@ -82,18 +85,21 @@ enum : StyleType {
     // CHANGETYPE?
     // CCTYPE?
 };
+inline constexpr int8_t getRefFromType(StyleType type) {
+    return static_cast<int8_t>((type & REFMASK) >> REF_OFFSET);
+}
 
 class Param;
 class BladeStyle;
 
-typedef std::variant<int32_t, BladeStyle*> ParamValue;
+using ParamValue = std::variant<int32_t, BladeStyle *>;
 
 class BladeStyle {
 public:
     BladeStyle(const BladeStyle&);
     virtual ~BladeStyle();
 
-    virtual StyleType getType() const;
+    [[nodiscard]] virtual StyleType getType() const;
 
     bool setParams(const std::vector<ParamValue>&);
     bool setParam(size_t idx, const ParamValue&);
@@ -103,30 +109,30 @@ public:
      */
     bool removeParam(size_t idx);
 
-    const std::vector<Param*>& getParams() const;
-    const Param* getParam(size_t idx) const;
+    [[nodiscard]] const std::vector<Param*>& getParams() const;
+    [[nodiscard]] const Param* getParam(size_t idx) const;
     virtual bool validateParams(std::string* err = nullptr) const;
 
     /** 
      * Get param as StyleParam, then get style from param.
      * Use  with caution, it's just static casts! 
      * */
-    inline const BladeStyle* getParamStyle(size_t idx) const;
+    [[nodiscard]] inline const BladeStyle* getParamStyle(size_t idx) const;
     /** 
      * Get param as NumberParam, then get number from param.
      * Use  with caution, it's just static casts! 
      * */
-    inline int32_t getParamNumber(size_t idx) const;
+    [[nodiscard]] inline int32_t getParamNumber(size_t idx) const;
     /** 
      * Get param as bitsparam, then get bits from param.
      * Use  with caution, it's just static casts! 
      * */
-    inline int32_t getParamBits(size_t idx) const;
+    [[nodiscard]] inline int32_t getParamBits(size_t idx) const;
     /** 
      * Get param as BoolParam, then get bool from param.
      * Use  with caution, it's just static casts! 
      * */
-    inline bool getParamBool(size_t idx) const;
+    [[nodiscard]] inline bool getParamBool(size_t idx) const;
 
     const char* osName;
     const char* humanName;
@@ -136,39 +142,39 @@ protected:
     BladeStyle(
             const char* osName, 
             const char* humanName, 
-            const StyleType type,
+            StyleType type,
             const std::vector<Param*>& params
             );
 
-    const StyleType type;
+    const StyleType pType;
 
 private:
-    std::vector<Param*> params{};
+    std::vector<Param*> mParams;
 };
 
 class Param {
 public:
     Param(const Param&) = delete;
-    virtual ~Param();
+    virtual ~Param() = default;
 
-    virtual StyleType getType() const;
+    [[nodiscard]] virtual StyleType getType() const;
 
     const char* name;
 
 protected:
     Param(const char* name, StyleType type);
 
-    const StyleType type;
+    const StyleType pType;
 };
 
 class StyleParam : public Param {
 public:
     StyleParam(const StyleParam&) = delete;
     StyleParam(const char* name, StyleType type, BladeStyle* style);
-    virtual ~StyleParam() override;
+     ~StyleParam() override;
 
     void setStyle(BladeStyle*);
-    const BladeStyle* getStyle() const;
+    [[nodiscard]] const BladeStyle* getStyle() const;
     /**
      * Clear pointer, return style
      *
@@ -177,45 +183,45 @@ public:
     [[nodiscard]] BladeStyle* detachStyle();
 
 private:
-    BladeStyle* style;
+    BladeStyle* mStyle;
 };
 
 class NumberParam : public Param {
 public:
-    NumberParam(const char* name, const StyleType initialValue = 0, const StyleType additionalFlags = 0);
+    NumberParam(const char* name, int32_t initialValue = 0, StyleType additionalFlags = 0);
 
     void setNum(int32_t);
-    int32_t getNum() const;
+    [[nodiscard]] int32_t getNum() const;
 
 private:
-    int32_t value;
+    int32_t mValue;
 };
 
 class BitsParam : public Param {
 public:
-    BitsParam(const char* name, const StyleType initialValue = 0, const StyleType additionalFlags = 0);
+    BitsParam(const char* name, int32_t initialValue = 0, StyleType additionalFlags = 0);
 
     void setBits(int32_t);
-    int32_t getBits() const;
+    [[nodiscard]] int32_t getBits() const;
 
 private:
-    int32_t value;
+    int32_t mValue;
 };
 
 class BoolParam : public Param {
 public:
-    BoolParam(const char* name, const bool initialValue = false, const StyleType additionalFlags = 0);
+    BoolParam(const char* name, bool initialValue = false, StyleType additionalFlags = 0);
 
     // These really don't need to exist for this one...
     void setBool(bool);
-    bool getBool() const;
+    [[nodiscard]] bool getBool() const;
 
 private:
-    bool value;
+    bool mValue;
 };
 
 inline const BladeStyle* BladeStyle::getParamStyle(size_t idx) const {
-    return static_cast<const BladeStyle*>(static_cast<const StyleParam*>(getParam(idx))->getStyle());
+    return static_cast<const StyleParam*>(getParam(idx))->getStyle();
 }
 
 inline int32_t BladeStyle::getParamNumber(size_t idx) const {
@@ -230,14 +236,14 @@ inline bool BladeStyle::getParamBool(size_t idx) const {
     return static_cast<const BoolParam*>(getParam(idx))->getBool();
 }
 
-typedef BladeStyle* (*StyleGenerator)(const std::vector<ParamValue>&);
-typedef std::map<std::string, StyleGenerator> StyleMap;
+using StyleGenerator = BladeStyle *(*)(const std::vector<ParamValue> &);
+using StyleMap = std::map<std::string, StyleGenerator>;
 
 StyleGenerator get(const std::string& styleName);
 
-#define STYLECAST(resultType, input) const_cast<resultType*>(static_cast<const resultType*>(input))
+#define STYLECAST(resultType, input) const_cast<resultType*>(static_cast<const resultType*>(input)) // NOLINT(bugprone-macro-parentheses)
 
-#define PARAMS(...) std::vector<Param*>{ __VA_ARGS__ }
+#define PARAMS(...) (std::vector<Param*>{ __VA_ARGS__ })
 #define PARAMVEC(...) std::vector<ParamValue>{ __VA_ARGS__ }
 #define STYLEPAIR(name) { \
     #name, \
@@ -251,4 +257,4 @@ StyleGenerator get(const std::string& styleName);
     } \
 }
 
-}
+} // namespace BladeStyles

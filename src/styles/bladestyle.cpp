@@ -20,21 +20,20 @@
  */
 
 #include "log/logger.h"
-#include "stylepreview/blade.h"
 #include "styles/elements/args.h"
+#include "styles/elements/builtin.h"
+#include "styles/elements/colors.h"
 #include "styles/elements/colorstyles.h"
 #include "styles/elements/effects.h"
 #include "styles/elements/functions.h"
 #include "styles/elements/layers.h"
 #include "styles/elements/lockuptype.h"
 #include "styles/elements/timefunctions.h"
-#include "styles/elements/colors.h"
-#include "styles/elements/builtin.h"
-#include "styles/elements/wrappers.h"
 #include "styles/elements/transitions.h"
-#include "ui/bool.h"
+#include "styles/elements/wrappers.h"
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <variant>
 
 using namespace BladeStyles;
@@ -46,17 +45,17 @@ BladeStyle::BladeStyle(
         const std::vector<Param*>& params) :
     osName(osName),
     humanName(humanName),
-    type(type),
-    params(params) {}
+    pType(type),
+    mParams(params) {}
 
 BladeStyle::BladeStyle(const BladeStyle& other) :
     osName(other.osName),
-    humanName(other.osName),
-    type(other.type) {
-    params.clear();
+    humanName(other.humanName),
+    pType(other.pType) {
+    mParams.clear();
 
-    for (const auto param : other.params) {
-        Param* newParam;
+    for (auto *const param : other.mParams) {
+        Param* newParam{nullptr};
         switch (param->getType() & FLAGMASK) {
             case NUMBER:
                 newParam = new NumberParam(param->name, static_cast<const NumberParam*>(param)->getNum(), param->getType());
@@ -68,23 +67,24 @@ BladeStyle::BladeStyle(const BladeStyle& other) :
                 newParam = new BoolParam(param->name, static_cast<const BoolParam*>(param)->getBool(), param->getType());
                 break;
             default:
-                newParam = new StyleParam(param->name, param->getType(), new BladeStyle(*static_cast<const StyleParam*>(param)->getStyle()));
+                const auto *newParamStyle{static_cast<const StyleParam*>(param)->getStyle()};
+                newParam = new StyleParam(param->name, param->getType(), newParamStyle ? new BladeStyle(*newParamStyle) : nullptr);
                 break;
         }
-        params.push_back(newParam);
+        mParams.push_back(newParam);
     }
 }
 
 BladeStyle::~BladeStyle() {
-    for (auto param : params) {
-        if (param) delete param;
+    for (auto *param : mParams) {
+         delete param;
     }
 }
 
-StyleType BladeStyle::getType() const { return type; }
+StyleType BladeStyle::getType() const { return pType; }
 
 StyleGenerator BladeStyles::get(const std::string& styleName) {
-    StyleGenerator gen;
+    StyleGenerator gen{nullptr};
 
     gen = FunctionStyle::get(styleName);
     if (gen) return gen;
@@ -113,7 +113,7 @@ StyleGenerator BladeStyles::get(const std::string& styleName) {
 }
 
 bool BladeStyle::validateParams(std::string* err) const {
-    for (const auto param : params) {
+    for (auto *const param : mParams) {
         if (!(param->getType() & STYLETYPE)) continue;
 
         if (!static_cast<const StyleParam*>(param)->getStyle()) {
@@ -129,10 +129,10 @@ bool BladeStyle::validateParams(std::string* err) const {
 }
 
 bool BladeStyle::setParams(const std::vector<ParamValue>& inParams) {
-    if (inParams.size() > params.size() && !(params.back()->getType() & VARIADIC)) return false;
+    if (inParams.size() > mParams.size() && !(mParams.back()->getType() & VARIADIC)) return false;
 
     for (size_t i{0}; i < inParams.size(); i++) {
-        if (i < params.size()) setParam(i, inParams.at(i));
+        if (i < mParams.size()) setParam(i, inParams.at(i));
         else addParam(inParams.at(i));
     }
 
@@ -140,29 +140,29 @@ bool BladeStyle::setParams(const std::vector<ParamValue>& inParams) {
 }
 
 bool BladeStyle::setParam(size_t idx, const ParamValue& inParam) {
-    if (idx >= params.size()) return false;
-    auto& param{params.at(idx)};
+    if (idx >= mParams.size()) return false;
+    auto& param{mParams.at(idx)};
 
     if (std::holds_alternative<BladeStyle*>(inParam)) {
-        auto inStyle{std::get<BladeStyle*>(inParam)};
-        if (!(inStyle->type & param->getType() & FLAGMASK)) return false;
+        auto *inStyle{std::get<BladeStyle*>(inParam)};
+        if (!(inStyle->pType & param->getType() & FLAGMASK)) return false;
         static_cast<StyleParam*>(param)->setStyle(inStyle);
         return true;
     }
 
-    switch (param->getType()) {
-        case FUNCTION:
+    switch (param->getType() & FLAGMASK) {
+        case NUMBER:
         case BOOL:
         case BITS:
             if (!std::holds_alternative<int32_t>(inParam)) return false;
             break;
         default:
-            Logger::error("Invalid Parameter");
+            Logger::error("setParam(): Invalid Parameter for index " + std::to_string(idx) + " in style " + osName);
             return false;
     }
 
-    switch (param->getType()) {
-        case FUNCTION:
+    switch (param->getType() & FLAGMASK) {
+        case NUMBER:
             static_cast<NumberParam*>(param)->setNum(std::get<int32_t>(inParam));
             break;
         case BOOL:
@@ -171,13 +171,16 @@ bool BladeStyle::setParam(size_t idx, const ParamValue& inParam) {
         case BITS:
             static_cast<BitsParam*>(param)->setBits(std::get<int32_t>(inParam));
             break;
+        default:
+            Logger::error("setParam(): Invalid Parameter for index " + std::to_string(idx) + " in style " + osName);
+            return false;
     }
 
     return true;
 }
 
 bool BladeStyle::addParam(const ParamValue& newParam) {
-    auto& lastParam{params.back()};
+    auto& lastParam{mParams.back()};
     if (~lastParam->getType() & VARIADIC) return false;
 
     switch (lastParam->getType() & FLAGMASK) {
@@ -198,9 +201,12 @@ bool BladeStyle::addParam(const ParamValue& newParam) {
             if (!std::holds_alternative<BladeStyle*>(newParam)) return false;
             if (!(std::get<BladeStyle*>(newParam)->getType() & lastParam->getType() & FLAGMASK)) return false;
             break;
+        default:
+            Logger::error("addParam(): Invalid type at end of params in style " + std::string(osName));
+            return false;
     }
 
-    Param* param;
+    Param* param{nullptr};
     switch (lastParam->getType() & FLAGMASK) {
         case NUMBER:
             param = new NumberParam(lastParam->name, std::get<int32_t>(newParam), lastParam->getType());
@@ -222,70 +228,71 @@ bool BladeStyle::addParam(const ParamValue& newParam) {
         case ARGUMENT:
             param = new StyleParam(lastParam->name, lastParam->getType(), std::get<BladeStyle*>(newParam));
             break;
+        default:
+            Logger::error("addParam(): Invalid type at end of params in style " + std::string(osName));
+            return false;
     }
 
-    params.push_back(param);
+    mParams.push_back(param);
     return true;
 }
 
 bool BladeStyle::removeParam(size_t idx) {
-    if (idx >= params.size()) return false;
-    auto it{std::next(params.begin(), idx)};
-    if (~(*it)->getType() & VARIADIC) return false;
+    if (idx >= mParams.size()) return false;
+    auto iter{std::next(mParams.begin(), static_cast<int32_t>(idx))};
+    if (~(*iter)->getType() & VARIADIC) return false;
 
-    if (*it) delete (*it);
-    params.erase(it);
+    if (*iter) delete (*iter);
+    mParams.erase(iter);
     return true;
 }
 
 const std::vector<Param*>& BladeStyle::getParams() const {
-    return params;
+    return mParams;
 }
 
 const Param* BladeStyle::getParam(size_t idx) const {
-    return idx >= params.size() ? nullptr : *std::next(params.begin(), idx);
+    return idx >= mParams.size() ? nullptr : *std::next(mParams.begin(), static_cast<int32_t>(idx));
 }
 
 Param::Param(const char* name, const StyleType type) :
-    name(name), type(type) {}
+    name(name), pType(type) {}
 
-Param::~Param() {}
-
-StyleType Param::getType() const { return type; }
+StyleType Param::getType() const { return pType; }
 
 StyleParam::StyleParam(const char* name, StyleType type, BladeStyle* style) :
-    Param(name, type), style(style) {}
+    Param(name, type), mStyle(style) {}
 
-StyleParam::~StyleParam() { if (style) delete style; }
+StyleParam::~StyleParam() {  delete mStyle; }
 
 void StyleParam::setStyle(BladeStyle* newStyle) {
-    if (style) delete style;
-    style = newStyle;
+    delete mStyle;
+    mStyle = newStyle;
 }
 
-const BladeStyle* StyleParam::getStyle() const { return style; }
+const BladeStyle* StyleParam::getStyle() const { return mStyle; }
 
 BladeStyle* StyleParam::detachStyle() {
-    auto ret{style};
-    style = nullptr;
+    auto *ret{mStyle};
+    mStyle = nullptr;
     return ret;
 }
 
-NumberParam::NumberParam(const char* name, const StyleType initialValue, const StyleType additionalFlags) :
-    Param(name, NUMBER | additionalFlags), value(initialValue) {}
+NumberParam::NumberParam(const char* name, const int32_t initialValue, const StyleType additionalFlags) :
+    Param(name, NUMBER | additionalFlags), mValue(initialValue) {}
 
-void NumberParam::setNum(int32_t newValue) { value = std::clamp(newValue, -32768, 32768); }
-int32_t NumberParam::getNum() const { return value; }
+void NumberParam::setNum(int32_t newValue) { mValue = std::clamp<int32_t>(newValue, std::numeric_limits<int16_t>::min(), std::numeric_limits<int16_t>::max() + 1); }
+int32_t NumberParam::getNum() const { return mValue; }
 
-BitsParam::BitsParam(const char* name, const StyleType initialValue, const StyleType additionalFlags) :
-    Param(name, BITS | additionalFlags), value(initialValue & 0xFFFF) {}
+BitsParam::BitsParam(const char* name, const int32_t initialValue, const StyleType additionalFlags) :
+    Param(name, BITS | additionalFlags), mValue(initialValue & std::numeric_limits<uint16_t>::max()) {}
 
-void BitsParam::setBits(int32_t newValue) { value = newValue & 0xFFFF; }
-int32_t BitsParam::getBits() const { return value; }
+void BitsParam::setBits(int32_t newValue) { mValue = newValue & std::numeric_limits<uint16_t>::max(); }
+int32_t BitsParam::getBits() const { return mValue; }
 
 BoolParam::BoolParam(const char* name, const bool initialValue, const StyleType additionalFlags) :
-    Param(name, BOOL | additionalFlags), value(initialValue) {}
+    Param(name, BOOL | additionalFlags), mValue(initialValue) {}
 
-void BoolParam::setBool(bool newValue) { value = newValue; }
-bool BoolParam::getBool() const { return value; }
+void BoolParam::setBool(bool newValue) { mValue = newValue; }
+bool BoolParam::getBool() const { return mValue; }
 

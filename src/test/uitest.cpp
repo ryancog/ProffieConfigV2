@@ -19,44 +19,51 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
-
+#include <wx/button.h>
 #include <wx/frame.h>
 #include <wx/sizer.h>
-#include <wx/button.h>
+#include <wx/stattext.h>
+#include <wx/wrapsizer.h>
 
-#include "styleeditor/blocks/styleblock.h"
-#include "styles/bladestyle.h"
+#include "ui/frame.h"
 #include "ui/movable.h"
-#include "styleeditor/blocks/block.h"
 
-PCUI::Frame* Test::init() {
-    auto frame{new PCUI::Frame(nullptr, wxID_ANY, "TestFrame")};
-    auto frameSizer{new wxBoxSizer(wxVERTICAL)};
-    auto moveArea{new PCUI::MoveArea(frame, wxID_ANY)};
+namespace Test {
+
+class MoveButton : public PCUI::Movable {
+public:
+    MoveButton(PCUI::MovePanel *parent, PCUI::MoveArea *moveArea, const wxString& title) :
+        PCUI::Movable(moveArea) {
+        Create(parent, wxID_ANY);
+
+        auto sizer{new wxBoxSizer(wxVERTICAL)};
+        auto text{new wxStaticText(this, wxID_ANY, title)};
+        sizer->AddSpacer(20);
+        sizer->Add(text);
+        sizer->AddSpacer(20);
+        SetSizer(sizer);
+    }
+};
+
+void run() {
+    auto *frame{new PCUI::Frame(nullptr, wxID_ANY, "TestFrame")};
+    auto *frameSizer{new wxBoxSizer(wxVERTICAL)};
+    auto *moveArea{new PCUI::MoveArea(frame, wxID_ANY)};
+    auto *areaSizer{new wxBoxSizer(wxVERTICAL)};
+    auto *movePanel{new PCUI::MovePanel(moveArea, moveArea, wxID_ANY)};
+    auto *panelSizer{new wxWrapSizer(wxHORIZONTAL)};
+
+    for (auto i{0}; i < 250; i++) {
+        panelSizer->Add(new MoveButton(movePanel, moveArea, "B"));
+    }
+
+    movePanel->SetSizer(panelSizer);
+    areaSizer->Add(movePanel, wxSizerFlags(1).Expand());
+    moveArea->SetSizer(areaSizer);
     frameSizer->Add(moveArea, wxSizerFlags(1).Expand());
-    auto areaSizer{new wxBoxSizer(wxVERTICAL)};
-    auto panel{new PCUI::MovePanel(moveArea, moveArea, wxID_ANY)};
-    areaSizer->Add(panel, wxSizerFlags(1).Expand());
-
-    // auto style{BladeStyles::get("Cylon")({})};
-    // PCUI::Block* block{new PCUI::StyleBlock(moveArea, panel, *style)};
-    auto style = BladeStyles::get("StylePtr")({});
-    auto block = new PCUI::StyleBlock(moveArea, panel, style);
-    style = BladeStyles::get("TrWipeSparkTipX")({});
-    block = new PCUI::StyleBlock(moveArea, panel, style);
-    // style = BladeStyles::get("AudioFlickerL")({});
-    // block = new PCUI::StyleBlock(moveArea, panel, *style);
-    // style = BladeStyles::get("AudioFlickerL")({});
-    // block = new PCUI::StyleBlock(moveArea, panel, *style);
-    // style = BladeStyles::get("BlastF")({});
-    // block = new PCUI::StyleBlock(moveArea, panel, *style);
-    // style = BladeStyles::get("&style_charging")({});
-    // block = new PCUI::StyleBlock(moveArea, panel, *style);
-
-    
-    moveArea->SetSizerAndFit(areaSizer);
     frame->SetSizer(frameSizer);
-
-    return frame;
+    frame->Show();
 }
+
+} // namespace Test
+

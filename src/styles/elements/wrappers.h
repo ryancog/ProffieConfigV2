@@ -38,4 +38,4 @@ private:
     static const StyleMap map;
 };
 
-}
+} // namespace BladeStyles

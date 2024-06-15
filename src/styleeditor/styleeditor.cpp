@@ -19,114 +19,119 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
-
-#include <wx/sizer.h>
-#include <wx/wrapsizer.h>
-#include <wx/splitter.h>
-#include <wx/gdicmn.h>
-#include <wx/srchctrl.h>
+#include <wx/clipbrd.h>
 #include <wx/event.h>
-#include <wx/tglbtn.h>
+#include <wx/gdicmn.h>
 #include <wx/scrolwin.h>
+#include <wx/sizer.h>
+#include <wx/splitter.h>
+#include <wx/srchctrl.h>
+#include <wx/tglbtn.h>
 #include <wx/time.h>
 #include <wx/timer.h>
-#include <wx/clipbrd.h>
 #include <wx/window.h>
+#include <wx/wrapsizer.h>
 
+#include "appcore/interfaces.h"
+#include "log/logger.h"
 #include "styleeditor/blocks/styleblock.h"
 #include "styles/bladestyle.h"
 #include "styles/elements/colorstyles.h"
 #include "styles/elements/functions.h"
 #include "styles/elements/transitions.h"
-#include "styles/elements/effects.h"
 #include "styles/parse.h"
 #include "ui/frame.h"
-#include "stylepreview/webview.h"
-#include "appcore/interfaces.h"
 #include "ui/movable.h"
 #include "wx/dataobj.h"
 
-static PCUI::Frame* frame{nullptr};
-static StyleEditor::StyleWebView* preview{nullptr};
+namespace StyleEditor {
 
-static void createUI();
-static void createToolbox(wxPanel*, PCUI::MoveArea*);
-static void bindEvents();
-static void updateVisibleBlocks();
-static void updateToolboxSize();
-static uint32_t filterType{BladeStyles::COLOR};
+PCUI::Frame* frame{nullptr};
 
-static wxToggleButton* styleFilter;
-static wxToggleButton* layerFilter;
-static wxToggleButton* funcFilter;
-static wxToggleButton* transitionFilter;
-static wxToggleButton* effectFilter;
-static std::vector<PCUI::Block*>* toolboxBlocks;
-static wxScrolledCanvas* toolbox{nullptr};
-static PCUI::MoveArea* blockMoveArea{nullptr};
-static PCUI::ScrolledMovePanel* blockWorkspace{nullptr};
+void createUI();
+void createToolbox();
+void bindEvents();
+void updateVisibleBlocks();
+void updateToolboxSize();
+uint32_t filterType{BladeStyles::COLOR};
 
-static constexpr auto jogDistance{20};
-static constexpr auto scrollUnits{jogDistance / 2};
+wxToggleButton* styleFilter;
+wxToggleButton* layerFilter;
+wxToggleButton* funcFilter;
+wxToggleButton* transitionFilter;
+wxToggleButton* effectFilter;
+std::vector<PCUI::StyleBlock*>* toolboxBlocks;
+wxScrolledCanvas* toolboxScroller{nullptr};
+wxPanel* toolbox{nullptr};
+PCUI::MoveArea* blockMoveArea{nullptr};
+PCUI::ScrolledMovePanel* blockWorkspace{nullptr};
+auto scale{1.F};
 
-void StyleEditor::launch(wxWindow* parent) {
+constexpr auto JOG_DISTANCE{20};
+constexpr auto SCROLL_UNITS{JOG_DISTANCE / 2};
+
+void launch(wxWindow* parent) {
     if (frame) {
         frame->Raise();
         return;
     }
 
     frame = new PCUI::Frame(parent, AppCore::Interface::STYLEMAN, "ProffieConfig Style Editor");
-    frame->setReference(reinterpret_cast<PCUI::Frame**>(&frame));
+    frame->setReference(&frame);
     createUI();
     updateVisibleBlocks();
     bindEvents();
 
     frame->Show();
-    frame->SetSize(600, 300);
+    frame->SetSize(600, 300); // NOLINT(readability-magic-numbers)
 }
 
 void createUI() {
-    auto frameSizer{new wxBoxSizer(wxVERTICAL)};
+    constexpr auto TOOLBOX_MIN_WIDTH{220};
+    constexpr auto WORKSPACE_MIN_WIDTH{100};
+
+    auto *frameSizer{new wxBoxSizer(wxVERTICAL)};
     blockMoveArea = new PCUI::MoveArea(frame, wxID_ANY);
     frameSizer->Add(blockMoveArea, wxSizerFlags(1).Expand());
-    auto moveAreaSizer{new wxBoxSizer(wxVERTICAL)};
-    auto splitter{new wxSplitterWindow(blockMoveArea, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_PERMIT_UNSPLIT)};
+    auto *moveAreaSizer{new wxBoxSizer(wxVERTICAL)};
+    auto *splitter{new wxSplitterWindow(blockMoveArea, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_PERMIT_UNSPLIT)};
     moveAreaSizer->Add(splitter, wxSizerFlags(1).Expand());
-    splitter->SetMinimumPaneSize(220);
+    splitter->SetMinimumPaneSize(TOOLBOX_MIN_WIDTH);
 
-    auto toolboxPanel{new wxPanel(splitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxNO_BORDER, "Toolbox")};
-    createToolbox(toolboxPanel, blockMoveArea);
+    toolbox = new wxPanel(splitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxNO_BORDER, "Toolbox");
+    createToolbox();
 
-    auto workspaceSplitter{new wxSplitterWindow(splitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE)};
-    workspaceSplitter->SetMinimumPaneSize(100);
-    preview = new StyleEditor::StyleWebView(workspaceSplitter, wxID_ANY);
+    auto *workspaceSplitter{new wxSplitterWindow(splitter, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE)};
+    workspaceSplitter->SetMinimumPaneSize(WORKSPACE_MIN_WIDTH);
+    auto preview = new wxPanel(workspaceSplitter, wxID_ANY);
 
     blockWorkspace = new PCUI::ScrolledMovePanel(workspaceSplitter, blockMoveArea, wxID_ANY);
     workspaceSplitter->SplitHorizontally(preview, blockWorkspace->getCanvas());
-    splitter->SplitVertically(toolboxPanel, workspaceSplitter);
+    splitter->SplitVertically(toolbox, workspaceSplitter);
 
     blockMoveArea->SetSizerAndFit(moveAreaSizer);
     frame->SetSizerAndFit(frameSizer);
 }
 
-void createToolbox(wxPanel* toolboxPanel, PCUI::MoveArea* moveArea) {
-    auto padSizer{new wxBoxSizer(wxHORIZONTAL)};
-    auto sizer{new wxBoxSizer(wxVERTICAL)};
-    padSizer->AddSpacer(5);
+void createToolbox() {
+    constexpr auto PADDING{5};
+
+    auto *padSizer{new wxBoxSizer(wxHORIZONTAL)};
+    auto *sizer{new wxBoxSizer(wxVERTICAL)};
+    padSizer->AddSpacer(PADDING);
     padSizer->Add(sizer, wxSizerFlags(1).Expand());
-    padSizer->AddSpacer(5);
+    padSizer->AddSpacer(PADDING);
 
-    auto blockSearch{new wxSearchCtrl(toolboxPanel, wxID_ANY)};
-    sizer->Add(blockSearch, wxSizerFlags(0).Expand().Border(wxTOP | wxBOTTOM, 5));
+    auto *blockSearch{new wxSearchCtrl(toolbox, wxID_ANY)};
+    sizer->Add(blockSearch, wxSizerFlags(0).Expand().Border(wxTOP | wxBOTTOM, PADDING));
 
-    auto categorySizer{new wxWrapSizer(wxHORIZONTAL)};
-    styleFilter = new wxToggleButton(toolboxPanel, BladeStyles::COLOR, "Styles");
+    auto *categorySizer{new wxWrapSizer(wxHORIZONTAL)};
+    styleFilter = new wxToggleButton(toolbox, BladeStyles::COLOR, "Styles");
     styleFilter->SetValue(true);
-    layerFilter = new wxToggleButton(toolboxPanel, BladeStyles::LAYER, "Layers");
-    funcFilter = new wxToggleButton(toolboxPanel, BladeStyles::FUNCTION, "Functions");
-    transitionFilter = new wxToggleButton(toolboxPanel, BladeStyles::TRANSITION, "Transitions");
-    effectFilter = new wxToggleButton(toolboxPanel, BladeStyles::EFFECT, "Effects");
+    layerFilter = new wxToggleButton(toolbox, BladeStyles::LAYER, "Layers");
+    funcFilter = new wxToggleButton(toolbox, BladeStyles::FUNCTION, "Functions");
+    transitionFilter = new wxToggleButton(toolbox, BladeStyles::TRANSITION, "Transitions");
+    effectFilter = new wxToggleButton(toolbox, BladeStyles::EFFECT, "Effects");
     categorySizer->Add(styleFilter, wxSizerFlags(0).Border(wxALL, 2));
     categorySizer->Add(layerFilter, wxSizerFlags(0).Border(wxALL, 2));
     categorySizer->Add(funcFilter, wxSizerFlags(0).Border(wxALL, 2));
@@ -134,26 +139,27 @@ void createToolbox(wxPanel* toolboxPanel, PCUI::MoveArea* moveArea) {
     categorySizer->Add(effectFilter, wxSizerFlags(0).Border(wxALL, 2));
 
     sizer->Add(categorySizer);
-    sizer->AddSpacer(10);
+    sizer->AddSpacer(PADDING * 2);
 
-    toolbox = new wxScrolledCanvas(toolboxPanel, wxID_ANY);
-    auto scrollSizer{new wxBoxSizer(wxVERTICAL)};
-    toolboxBlocks = new std::vector<PCUI::Block*>;
+    toolboxScroller = new wxScrolledCanvas(toolbox, wxID_ANY);
+    auto *scrollSizer{new wxBoxSizer(wxVERTICAL)};
+    toolboxBlocks = new std::vector<PCUI::StyleBlock*>;
 
-    auto addStyleBlock{[&moveArea, &scrollSizer](const BladeStyles::StyleGenerator& generator) {
-        auto style{generator({})};
-        auto block{new PCUI::StyleBlock(nullptr, toolbox, style)};
+    auto addStyleBlock{[&scrollSizer](const BladeStyles::StyleGenerator& generator) {
+        auto *style{generator({})};
+        auto *block{new PCUI::StyleBlock(nullptr, toolboxScroller, style)};
 
         toolboxBlocks->push_back(block);
         block->collapse();
         block->Bind(PCUI::SB_COLLAPSED, [](wxCommandEvent&){ updateToolboxSize(); });
-        block->Bind(wxEVT_LEFT_DOWN, [block, moveArea](wxMouseEvent& evt){
+        block->Bind(wxEVT_LEFT_DOWN, [block](wxMouseEvent& evt){
             evt.Skip(false);
             if (!block->hitTest(evt.GetPosition())) return;
 
-            auto newBlock{new PCUI::StyleBlock(moveArea, toolbox, new BladeStyles::BladeStyle(*block->getStyle()))};
+            auto *newBlock{new PCUI::StyleBlock(blockMoveArea, toolboxScroller, new BladeStyles::BladeStyle(*block->getStyle()))};
 
             newBlock->collapse(block->isCollapsed());
+            newBlock->setScale(scale);
             newBlock->SetPosition(block->GetPosition());
             newBlock->doGrab(evt);
         });
@@ -162,30 +168,30 @@ void createToolbox(wxPanel* toolboxPanel, PCUI::MoveArea* moveArea) {
             child->Bind(wxEVT_LEFT_DOWN, [](wxMouseEvent& evt) { evt.Skip(false); });
             child->Disable();
         }
-        scrollSizer->Add(block, wxSizerFlags(0).Border(wxALL, 5));
+        scrollSizer->Add(block, wxSizerFlags(0).Border(wxALL, PADDING));
     }};
 
     for (const auto& [ _, generator ] : BladeStyles::ColorStyle::getMap()) addStyleBlock(generator);
     for (const auto& [ _, generator ] : BladeStyles::FunctionStyle::getMap()) addStyleBlock(generator);
     for (const auto& [ _, generator ] : BladeStyles::TransitionStyle::getMap()) addStyleBlock(generator);
 
-    toolbox->SetSizerAndFit(scrollSizer);
-    toolbox->SetMinSize({200, 200});
-    sizer->Add(toolbox, wxSizerFlags(1).Expand());
+    toolboxScroller->SetSizerAndFit(scrollSizer);
+    toolboxScroller->SetMinSize({200, 200}); // NOLINT(readability-magic-numbers)
+    sizer->Add(toolboxScroller, wxSizerFlags(1).Expand());
 
-    toolboxPanel->SetSizerAndFit(padSizer);
+    toolbox->SetSizerAndFit(padSizer);
 }
 
 void updateToolboxSize() {
-    toolbox->GetSizer()->Layout();
-    toolbox->SetVirtualSize(toolbox->GetBestVirtualSize());
-    auto virtSize{toolbox->GetVirtualSize()};
-    static constexpr auto scrollUnits{15};
-    toolbox->SetScrollbars(scrollUnits, scrollUnits, virtSize.x / scrollUnits, virtSize.y / scrollUnits);
+    toolboxScroller->GetSizer()->Layout();
+    toolboxScroller->SetVirtualSize(toolboxScroller->GetBestVirtualSize());
+    auto virtSize{toolboxScroller->GetVirtualSize()};
+    static constexpr auto SCROLL_UNITS{15};
+    toolboxScroller->SetScrollbars(SCROLL_UNITS, SCROLL_UNITS, virtSize.x / SCROLL_UNITS, virtSize.y / SCROLL_UNITS);
 }
 
 void updateVisibleBlocks() {
-    for (const auto block : *toolboxBlocks) {
+    for (auto *const block : *toolboxBlocks) {
         auto shown{(block->type & BladeStyles::FLAGMASK) & filterType};
         block->Show(shown);
     }
@@ -201,13 +207,13 @@ void bindEvents() {
         }
     });
     toolbox->Bind(wxEVT_TOGGLEBUTTON, [](wxCommandEvent& evt) {
-        auto button{static_cast<wxToggleButton*>(evt.GetEventObject())};
+        auto *button{static_cast<wxToggleButton*>(evt.GetEventObject())};
         if (!button->GetValue()) {
             button->SetValue(true);
             return;
         }
 
-#       define FILTER(filter, type) if (button != filter) filter->SetValue(false); else filterType = type
+#       define FILTER(filter, type) if (button != (filter)) (filter)->SetValue(false); else filterType = type
         FILTER(styleFilter, BladeStyles::COLOR);
         FILTER(layerFilter, BladeStyles::LAYER);
         FILTER(funcFilter, BladeStyles::FUNCTION);
@@ -224,13 +230,43 @@ void bindEvents() {
         wxClipboard::Get()->Close();
 
         auto styleStr{textData.GetText().ToStdString()};
-        auto style{BladeStyles::parseString(styleStr)};
+        auto *style{BladeStyles::parseString(styleStr)};
         if (!style) return;
 
-        auto block{new PCUI::StyleBlock(blockMoveArea, blockWorkspace, style)};
+        auto *block{new PCUI::StyleBlock(blockMoveArea, blockWorkspace, style)};
         block->SetPosition(blockWorkspace->ScreenToClient(wxGetMousePosition()));
+    });
+
+    // This should be turned into a menu option w/ accelerator
+    frame->Bind(wxEVT_CHAR_HOOK, [](wxKeyEvent& evt){
+        evt.Skip();
+#       ifdef __WXOSX__
+        if (!evt.CmdDown()) return;
+#       else
+        if (!evt.ControlDown()) return;
+#       endif
+
+        constexpr auto SCALE_DIFF{0.1F};
+        switch (evt.GetUnicodeKey()) {
+            case '=':
+                if (!evt.ShiftDown()) return;
+            case '+':
+                if (scale < 1.F) scale += SCALE_DIFF; // NOLINT(readability-magic-numbers)
+                break;
+            case '-':
+                if (scale > 0.7F) scale -= SCALE_DIFF; // NOLINT(readability-magic-numbers)
+                break;
+            default:
+                return;
+        }
+        for (auto *const child : blockWorkspace->GetChildren()) {
+            auto *styleBlock{dynamic_cast<PCUI::StyleBlock*>(child)};
+            if (!styleBlock) return;
+
+            styleBlock->setScale(scale);
+            styleBlock->update(false);
+        }
     });
 }
 
-// StyleEditor::StyleWebView* StyleEditor::getPreview() { return preview; }
-
+} // namespace StyleEditor

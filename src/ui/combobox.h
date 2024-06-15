@@ -19,9 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <wx/combobox.h>
 #include <wx/panel.h>
 #include <wx/stattext.h>
-#include <wx/combobox.h>
 
 namespace PCUI {
 
@@ -29,22 +29,22 @@ class ComboBox : public wxPanel {
 public:
     ComboBox(
         wxWindow* parent,
-        int32_t id = wxID_ANY,
+        wxWindowID winID = wxID_ANY,
         const wxString& label = wxEmptyString,
         const wxSize& size = wxDefaultSize,
         const wxArrayString& choices = {},
-        int32_t style = 0,
-        const wxOrientation& orient = wxVERTICAL
+        int64_t style = 0,
+        wxOrientation orient = wxVERTICAL
         );
 
     void setToolTip(wxToolTip* tip);
 
-    const wxComboBox* entry() const;
-    const wxStaticText* text() const;
+    [[nodiscard]] const wxComboBox* entry() const;
+    [[nodiscard]] const wxStaticText* text() const;
 
 private:
     wxComboBox* mEntry{nullptr};
     wxStaticText* mText{nullptr};
 };
 
-}
+} // namespace PCUI

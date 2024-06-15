@@ -28,23 +28,23 @@ namespace PCUI {
 class Text : wxPanel {
 public:
     Text(
-        wxWindow* parent,
-        int32_t id = wxID_ANY,
-        const wxString& label = wxEmptyString,
-        const wxString& initial = wxEmptyString,
-        const wxSize& size = wxDefaultSize,
-        int32_t style = 0,
-        const wxOrientation& orient = wxVERTICAL
+        wxWindow *parent,
+        wxWindowID winID = wxID_ANY,
+        const wxString &label = wxEmptyString,
+        const wxString &initial = wxEmptyString,
+        const wxSize &size = wxDefaultSize,
+        int64_t style = 0,
+        wxOrientation orient = wxVERTICAL
         );
 
     void setToolTip(wxToolTip* tip);
 
-    const wxTextCtrl* entry() const;
-    const wxStaticText* text() const;
+    [[nodiscard]] const wxTextCtrl* entry() const;
+    [[nodiscard]] const wxStaticText* text() const;
 
 private:
-    wxTextCtrl* mEntry{nullptr};
-    wxStaticText* mText{nullptr};
+    wxTextCtrl *mEntry{nullptr};
+    wxStaticText *mText{nullptr};
 };
 
-}
+} // namespace PCUI
