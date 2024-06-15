@@ -29,15 +29,14 @@
 
 class ProffieConfig : public wxApp {
 public:
-    void setupTheme() {
-#	ifdef __WXMSW__
-#	elif defined(__WXGTK__) && defined(__WINDOWS__)
+    static void platformSetup() {
+#	    if defined(__WXGTK__) && defined(__WINDOWS__)
         putenv(std::string("GTK_CSD=0").data());
         putenv(std::string(R"(GTK_THEME=../../resources/Orchis-Red-Dark-Compact)").data());
-#	endif
-    }
-
-    bool OnInit() override {
+#	    endif
+#       ifdef __WXGTK__
+        GTKSuppressDiagnostics();
+#       endif
 #   	ifdef __WINDOWS__
         if (AttachConsole(ATTACH_PARENT_PROCESS) || AllocConsole()){
             freopen("CONOUT$", "w", stdout);
@@ -46,12 +45,11 @@ public:
             std::ios::sync_with_stdio();
         }
 #		endif
-#       ifdef __WXGTK__
-        GTKSuppressDiagnostics();
-#       endif
-        setupTheme();
+    }
 
+    bool OnInit() override {
         chdir(argv[0].BeforeLast('/'));
+        platformSetup();
 
         AppCore::init();
 
