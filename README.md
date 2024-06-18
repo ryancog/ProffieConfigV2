@@ -1,5 +1,11 @@
 # ProffieConfig 
 
+---
+
+## This version is incomplete and in-progress!!
+
+---
+
 <img align="left" src=https://github.com/ryancog/ProffieConfig/blob/master/resources/icons/icon.svg width=200> 
   
 All-In-One ProffieBoard Management Utility. 
