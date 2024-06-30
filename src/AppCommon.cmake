@@ -61,6 +61,7 @@ foreach(FLAG ${WX_CXXFLAG_LIST})
 endforeach()
 link_libraries(${WX_LDFLAGS})
 
+add_compile_options("-DVERSION=${CMAKE_PROJECT_VERSION}")
 add_executable(${APP_TARGET} ${SOURCES})
 
 if (DEFINED LIB_RPATH)
@@ -69,4 +70,7 @@ if (DEFINED LIB_RPATH)
         BUILD_WITH_INSTALL_RPATH true
     )
 endif()
+
+# Export version value
+write_file(VERSION "${CMAKE_PROJECT_VERSION}")
 
