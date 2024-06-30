@@ -47,16 +47,11 @@ enum class SettingType {
     COMBO
 };
 
-template<class BASE>
-concept Base = (std::is_same_v<BASE, SettingBase> || std::derived_from<BASE, SettingBase>) && requires (BASE base) {
-    { base.getType() } -> std::same_as<SettingType>;
-};
-
-template<Base> struct Toggle;
-template<Base> struct Selection;
-template<Base> struct Numeric;
-template<Base> struct Decimal;
-template<Base> struct Combo;
+template<class> struct Toggle;
+template<class> struct Selection;
+template<class> struct Numeric;
+template<class> struct Decimal;
+template<class> struct Combo;
 
 struct SettingBase {
     SettingBase() = default;
@@ -86,7 +81,7 @@ struct DefineBase : SettingBase {
 };
 
 
-template<Base BASE>
+template<class BASE>
 struct Toggle : BASE {
     std::unordered_set<std::string> disable;
     bool value{false};
@@ -96,7 +91,7 @@ struct Toggle : BASE {
     [[nodiscard]] virtual SettingType getType() const { return SettingType::TOGGLE; }
 };
 
-template<Base BASE> 
+template<class BASE>
 struct Selection : Toggle<BASE> {
     bool output{true};
     std::unordered_set<Selection*> peers;
@@ -106,7 +101,7 @@ struct Selection : Toggle<BASE> {
     [[nodiscard]] virtual SettingType getType() const { return SettingType::SELECTION; }
 };
 
-template<Base BASE>
+template<class BASE>
 struct Numeric : BASE {
     int32_t min{0};
     int32_t max{100}; // NOLINT(readability-magic-numbers)
@@ -118,7 +113,7 @@ struct Numeric : BASE {
     [[nodiscard]] virtual SettingType getType() const { return SettingType::NUMERIC; }
 };
 
-template<Base BASE>
+template<class BASE>
 struct Decimal : BASE {
     double min{0};
     double max{0};
@@ -130,7 +125,7 @@ struct Decimal : BASE {
     [[nodiscard]] virtual SettingType getType() const { return SettingType::DECIMAL; }
 };
 
-template<Base BASE>
+template<class BASE>
 struct Combo : BASE {
     using OptionMap = std::unordered_map<std::string, std::string>;
     OptionMap options;
