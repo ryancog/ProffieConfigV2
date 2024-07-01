@@ -93,5 +93,12 @@ for i in ${WX_LIBNAMES}; do
     done
 done
 
+echo "Cleaning up..."
+# Success, logs are not needed!
+rm -rf wxconfigure.log
+rm -rf wxbuild.log
+rm -rf wxinstall.log
+
+
 echo "Done!"
 
