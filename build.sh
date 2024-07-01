@@ -1,26 +1,28 @@
 #!/bin/sh
 
-NUM_PROCS=`nproc --all`
-CLEAN=false
 
-echo "Detecting target platform..."
-if [ "$OSTYPE" == "linux-gnu" ]; then
-    BUILD_PLATFORM=linux
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    BUILD_PLATFORM=macOS
-else
-    echo "Unsupported build platform: $OSTYPE"
-    exit 1
-fi
+detect_platform() {
+    echo "Detecting target platform..."
+    NUM_PROCS=`nproc --all`
 
-if [ "$1" == "--CROSS_LINUX" ]; then
-    CMAKE_FLAGS="-DCROSS_LINUX=ON"
-    BUILD_PLATFORM=linux
-elif [ "$1" == "--CROSS_WIN32" ]; then
-    CMAKE_FLAGS="-DCROSS_WIN32=ON"
-    BUILD_PLATFORM=win32
-fi
-echo "Platform: $BUILD_PLATFORM"
+    if [ "$OSTYPE" == "linux-gnu" ]; then
+        BUILD_PLATFORM=linux
+    elif [[ "$OSTYPE" == "darwin"* ]]; then
+        BUILD_PLATFORM=macOS
+    else
+        echo "Unsupported build platform: $OSTYPE"
+        exit 1
+    fi
+
+    if [ "$1" == "--CROSS_LINUX" ]; then
+        CMAKE_FLAGS="-DCROSS_LINUX=ON"
+        BUILD_PLATFORM=linux
+    elif [ "$1" == "--CROSS_WIN32" ]; then
+        CMAKE_FLAGS="-DCROSS_WIN32=ON"
+        BUILD_PLATFORM=win32
+    fi
+    echo "Platform: $BUILD_PLATFORM"
+}
 
 build_target() {
     echo "Building target $1..."
@@ -50,17 +52,15 @@ build_target() {
     cd $PREV_DIR
 }
 
-build_target "launcher"
-if $CLEAN; then
-    exit 0;
-fi
-
-mkdir -p build
-mkdir -p build/$BUILD_PLATFORM
-deploy_target() { cp src/$1/build-$BUILD_PLATFORM/$1 $EXECUTABLE_DIR/
+deploy_target() { 
+    echo "Deploying target $1..."
+    cp src/$1/build/$1 $EXECUTABLE_DIR/
 }
+
 setup_deploy() {
     echo "Setting up for build deploy..."
+    mkdir -p build
+    mkdir -p build/$BUILD_PLATFORM
     if [ "$BUILD_PLATFORM" == "macOS" ]; then
         local BUNDLE_PATH=build/$BUILD_PLATFORM/ProffieConfig.app
         local VERSION=`cat VERSION`
@@ -102,26 +102,34 @@ setup_deploy() {
          " > $BUNDLE_PATH/Contents/Info.plist
 
     elif [ "$BUILD_PLATFORM" == "win32" ]; then
-        echo ""
+        local DEPLOY_PATH=build/$BUILD_PLATFORM
+        EXECUTABLE_DIR=$DEPLOY_PATH/bin
+        RESOURCE_DIR=$DEPLOY_PATH/resources
+        LIB_DIR=$DEPLOY_PATH/bin
     elif [ "$BUILD_PLATFORM" == "linux" ]; then
-        echo ""
+        local DEPLOY_PATH=build/$BUILD_PLATFORM
+        EXECUTABLE_DIR=$DEPLOY_PATH/bin
+        RESOURCE_DIR=$DEPLOY_PATH/resources
+        LIB_DIR=$DEPLOY_PATH/lib
     fi
 }
+
 deploy_resources() {
     echo "Deploying resources..."
     if [ "$BUILD_PLATFORM" == "macOS" ]; then
         cp resources/icons/icon.icns $RESOURCE_DIR/
-
     elif [ "$BUILD_PLATFORM" == "win32" ]; then
-        echo ""
+        echo "TODO"
     elif [ "$BUILD_PLATFORM" == "linux" ]; then
-        echo ""
+        echo "TODO"
     fi
 }
+
 deploy_libs() {
     echo "Deploying libraries..."
+    local LIBS
     if [ "$BUILD_PLATFORM" == "macOS" ]; then
-        local LIBS
+        local LIB_BUILD_DIR=3rdparty/wxWidgets/install-macOS/lib
         # terminated with - to prevent issues like baseu_[unwanted] being added
         LIBS+="libwx_osx_cocoau_xrc- "
         LIBS+="libwx_osx_cocoau_html- "
@@ -131,31 +139,37 @@ deploy_libs() {
         LIBS+="libwx_baseu_net- "
         LIBS+="libwx_baseu- "
 
-        for lib in ${LIBS}; do
-            local ORIGINAL=""
-            for file in `ls 3rdparty/wxWidgets/install-macOS/lib | grep $lib`; do
-                if [ "$ORIGINAL" == "" ]; then
-                    cp 3rdparty/wxWidgets/install-macOS/lib/$file $LIB_DIR/
-                    ORIGINAL=$file
-                else
-                    local PREV_DIR=`pwd`
-                    cd $LIB_DIR
-                    ln -s "./$ORIGINAL" "./$file"
-                    cd $PREV_DIR
-                fi
-            done
-        done
-
     elif [ "$BUILD_PLATFORM" == "win32" ]; then
-        echo ""
+        local LIB_BUILD_DIR=3rdparty/wxWidgets/install-win32/bin
     elif [ "$BUILD_PLATFORM" == "linux" ]; then
-        echo ""
+        local LIB_BUILD_DIR=3rdparty/wxWidgets/install-linux/lib64
     fi
+
+    for lib in ${LIBS}; do
+        local ORIGINAL=""
+        for file in `ls $LIB_BUILD_DIR | grep $lib`; do
+            if [ "$ORIGINAL" == "" ]; then
+                cp $LIB_BUILD_DIR/$file $LIB_DIR/
+                ORIGINAL=$file
+            else
+                local PREV_DIR=`pwd`
+                cd $LIB_DIR
+                ln -s "./$ORIGINAL" "./$file"
+                cd $PREV_DIR
+            fi
+        done
+    done
 }
+
+detect_platform
+
+build_target "launcher"
 
 setup_deploy
 deploy_resources
 deploy_libs
+
 deploy_target "launcher"
+
 echo "Done."
 
