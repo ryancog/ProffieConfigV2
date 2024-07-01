@@ -1,17 +1,16 @@
 #!/bin/sh
 
-NUM_PROCS=$(nproc --all)
+NUM_PROCS=`nproc --all`
 CLEAN=false
 
 if [ "$OSTYPE" == "linux-gnu" ]; then
     BUILD_PLATFORM=linux
-elif [ "$OSTYPE" == "darwin" ]; then
+elif [[ "$OSTYPE" == "darwin"* ]]; then
     BUILD_PLATFORM=macOS
 else
-    echo "Unsupported build platform!!"
+    echo "Unsupported build platform: $OSTYPE"
     exit 1
 fi
-
 if [ "$1" == "--CROSS_LINUX" ]; then
     CMAKE_FLAGS="-DCROSS_LINUX=ON"
     BUILD_PLATFORM=linux
@@ -24,7 +23,7 @@ elif [ "$1" == "--CLEAN" ]; then
 fi
 
 build_target() {
-    local PREV_DIR=$(pwd)
+    local PREV_DIR=`pwd`
     cd src/$1
 
     if $CLEAN; then
@@ -35,15 +34,29 @@ build_target() {
     local BUILD_DIR=build-$BUILD_PLATFORM
     mkdir -p $BUILD_DIR
     cd $BUILD_DIR
-    cmake $CMAKE_FLAGS ..
-    make -j$NUM_PROCS
+    if ! cmake $CMAKE_FLAGS ..; then
+        echo "Error running CMake!"
+        exit 1;
+    fi
+    if ! make -j$NUM_PROCS; then
+        echo "Error building!!"
+        exit 1;
+    fi
 
     cd $PREV_DIR
 }
 
+build_target "launcher"
+if $CLEAN; then
+    exit 0;
+fi
+
+mkdir -p build
+mkdir -p build/$BUILD_PLATFORM
 deploy_target() {
     if [ "$BUILD_PLATFORM" == "macOS" ]; then
-        echo ""
+        local BUNDLE_PATH=build/$BUILD_PLATFORM/ProffieConfig.app
+        cp src/$1/build-$BUILD_PLATFORM/$1 $BUNDLE_PATH/Contents/MacOS/
     elif [ "$BUILD_PLATFORM" == "win32" ]; then
         echo ""
     elif [ "$BUILD_PLATFORM" == "linux" ]; then
@@ -57,7 +70,7 @@ deploy_target() {
 setup_deploy() {
     if [ "$BUILD_PLATFORM" == "macOS" ]; then
         local BUNDLE_PATH=build/$BUILD_PLATFORM/ProffieConfig.app
-        local VERSION=$(cat VERSION)
+        local VERSION=`cat VERSION`
         mkdir -p $BUNDLE_PATH
         mkdir -p $BUNDLE_PATH/Contents
         mkdir -p $BUNDLE_PATH/Contents/MacOS
@@ -88,18 +101,14 @@ setup_deploy() {
                 <true/>
             </dict>
             </plist>
-         " >> $BUNDLE_PATH/Contents/info.plist
+         " > $BUNDLE_PATH/Contents/Info.plist
+         cp resources/icons/icon.icns $BUNDLE_PATH/Contents/Resources/
     elif [ "$BUILD_PLATFORM" == "win32" ]; then
         echo ""
     elif [ "$BUILD_PLATFORM" == "linux" ]; then
         echo ""
     fi
 }
-
-build_target "launcher"
-
-mkdir -p build
-mkdir -p build/$BUILD_PLATFORM
 setup_deploy
 deploy_target "launcher"
 

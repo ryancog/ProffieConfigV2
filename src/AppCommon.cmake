@@ -28,8 +28,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin" ) # macOS
     set(CMAKE_C_COMPILER clang)
     set(CMAKE_CXX_COMPILER clang++)
 
-    set(WX_PREFIX "${CMAKE_SOURCE_DIR}/../../3rdparty/wxWidgets/install-macos")
-    # set(LIB_DIR "$ORIGIN/../lib")
+    set(WX_PREFIX "${CMAKE_SOURCE_DIR}/../../3rdparty/wxWidgets/install-macOS")
+    set(LIB_RPATH "@executable_path/../Frameworks/")
 else()
     message(FATAL_ERROR "Unsupported platform or configuration")
 endif()
@@ -47,6 +47,9 @@ execute_process(
     OUTPUT_VARIABLE WX_LDFLAGS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
+message("CFlags: ${WX_CXXFLAGS}")
+message("LFlags: ${WX_LDFLAGS}")
 
 # Extract and correctly place cxxflags
 string(REPLACE " " ";" WX_CXXFLAG_LIST "${WX_CXXFLAGS}")
