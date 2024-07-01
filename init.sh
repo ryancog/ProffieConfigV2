@@ -74,24 +74,31 @@ if ! make install &> $ORIGINAL_DIR/wxinstall.log; then
     exit 1
 fi
 
-# set install_name of libs correctly
-# To be completely honest, I don't fully understand this.
-# It comes from an old, tweaked version of wxWidgets' 
-# change_names_tool... found it on an old forum post.
-# "using @rpath on the mac"
 
-echo "Patching wxWidgets libs with @rpath..."
-cd $WX_INSTALL_PREFIX
-WX_LIB_DIR=$WX_INSTALL_PREFIX/lib
-WX_LIB_NAME_PREFIX=@rpath
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # set install_name of libs correctly
+    # To be completely honest, I don't fully understand this.
+    # It comes from an old, tweaked version of wxWidgets' 
+    # change_names_tool... found it on an old forum post.
+    # "using @rpath on the mac"
+    #
+    # Basically it's just changing the link names of all the libs to @rpath/[name] that way
+    # the install location can be dynamically changed when building the actual application(s).
+    echo "Patching wxWidgets libs with @rpath..."
+    cd $WX_INSTALL_PREFIX
+    WX_LIB_DIR=$WX_INSTALL_PREFIX/lib
+    WX_LIB_NAME_PREFIX=@rpath
 
-WX_LIBNAMES=`cd ${WX_LIB_DIR}; ls -1 | grep '\.[0-9][0-9]*\.dylib$'`
-for i in ${WX_LIBNAMES}; do
-    install_name_tool -id ${WX_LIB_NAME_PREFIX}/${i} ${WX_LIB_DIR}/${i}
-    for dep in ${WX_LIBNAMES}; do
-        install_name_tool -change ${WX_LIB_DIR}/${dep} ${WX_LIB_NAME_PREFIX}/${dep} ${WX_LIB_DIR}/${i}
+    WX_LIBNAMES=`cd ${WX_LIB_DIR}; ls -1 | grep '\.[0-9][0-9]*\.dylib$'`
+    for i in ${WX_LIBNAMES}; do
+        install_name_tool -id ${WX_LIB_NAME_PREFIX}/${i} ${WX_LIB_DIR}/${i}
+        for dep in ${WX_LIBNAMES}; do
+            install_name_tool -change ${WX_LIB_DIR}/${dep} ${WX_LIB_NAME_PREFIX}/${dep} ${WX_LIB_DIR}/${i}
+        done
     done
-done
+fi
+
+cd $ORIGINAL_DIR
 
 echo "Cleaning up..."
 # Success, logs are not needed!

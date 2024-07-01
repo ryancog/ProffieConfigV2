@@ -22,7 +22,7 @@ elseif(CROSS_LINUX OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(CMAKE_CXX_COMPILER clang++)
 
     set(WX_PREFIX "${CMAKE_SOURCE_DIR}/../../3rdparty/wxWidgets/install-linux")
-    set(LIB_RPATH "$ORIGIN/lib")
+    set(LIB_RPATH "$ORIGIN/../lib")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin" ) # macOS
     message("Building for macOS")
     set(CMAKE_C_COMPILER clang)
@@ -65,7 +65,7 @@ endforeach()
 link_libraries(${WX_LDFLAGS})
 
 add_compile_options("-DVERSION=${CMAKE_PROJECT_VERSION}")
-add_executable(${APP_TARGET} ${SOURCES})
+add_executable(${APP_TARGET} WIN32 ${SOURCES})
 
 if (DEFINED LIB_RPATH)
     set_target_properties(${APP_TARGET} PROPERTIES
